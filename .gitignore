@@ -1,1 +1,20 @@
+# dependencies
+node_modules
+
+# build output
+dist
+
+# environment (huwag i-commit ang totoong keys)
 .env
+.env.local
+.env.*.local
+
+# logs
+*.log
+npm-debug.log*
+
+# editor / OS
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
