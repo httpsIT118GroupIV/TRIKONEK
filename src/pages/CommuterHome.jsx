@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   getSheds, getOnlineDrivers, getMyWaitingSignals, sendSignal, cancelSignal,
 } from '../services/mapService';
-import MapView from "../components/Map/Mapview";
+import MapView from "../components/Map/MapView";
 import PaymentSelector from '../components/Commuter/PaymentSelector';
 
 export default function CommuterHome() {
