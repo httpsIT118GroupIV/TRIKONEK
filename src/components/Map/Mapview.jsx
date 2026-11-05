@@ -53,3 +53,4 @@ export default function MapView({ sheds, drivers, waitingByShed, busy, onSignal,
     </MapContainer>
   );
 }
+
