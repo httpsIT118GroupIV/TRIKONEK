@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { MapContainer, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, ZoomControl, useMap } from 'react-leaflet';
 import TricycleMarker from './TricycleMarker';
 import ShedMarker from './ShedMarker';
 
@@ -15,9 +15,9 @@ function BoundsLock({ sheds }) {
   useEffect(() => {
     const pts = sheds.map((s) => [Number(s.latitude), Number(s.longitude)]);
     const base = pts.length ? L.latLngBounds(pts) : FALLBACK;
-    const bounds = base.pad(0.25); // 25% na palugit sa paligid
-    map.setMinZoom(map.getBoundsZoom(bounds)); // hindi na makaka-zoom out lampas dito
-    map.setMaxBounds(bounds); // hindi na makaka-drag lampas dito
+    const bounds = base.pad(0.25);
+    map.setMinZoom(map.getBoundsZoom(bounds));
+    map.setMaxBounds(bounds);
     map.fitBounds(bounds);
   }, [sheds, map]);
   return null;
@@ -30,12 +30,14 @@ export default function MapView({ sheds, drivers, waitingByShed, busy, onSignal,
       zoom={13}
       maxZoom={18}
       maxBoundsViscosity={1.0}
+      zoomControl={false}
       style={{ height: '100%', width: '100%' }}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
+      <ZoomControl position="bottomright" />
       <BoundsLock sheds={sheds} />
       {sheds.map((s) => (
         <ShedMarker
@@ -53,4 +55,3 @@ export default function MapView({ sheds, drivers, waitingByShed, busy, onSignal,
     </MapContainer>
   );
 }
-

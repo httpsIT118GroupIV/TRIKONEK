@@ -1,23 +1,35 @@
+import { useLang } from '../../context/LanguageContext';
+
 export default function ShiftSwitch({ isOnline, onChange, disabled }) {
+  const { t } = useLang();
   return (
-    <section style={card}>
-      <h3 style={{ marginTop: 0 }}>Shift visibility</h3>
-      <p>
-        Ngayon:{' '}
-        <strong style={{ color: isOnline ? 'green' : 'gray' }}>
-          {isOnline ? 'ONLINE (nakikita sa mapa)' : 'OFFLINE (nakatago)'}
-        </strong>
-      </p>
+    <section className="card">
+      <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500">{t('shift.title')}</h3>
+
+      <div className="mt-3 flex items-center gap-3">
+        <span className="relative flex h-3 w-3">
+          {isOnline && (
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-available opacity-60" />
+          )}
+          <span className={`relative inline-flex h-3 w-3 rounded-full ${isOnline ? 'bg-available' : 'bg-gray-400'}`} />
+        </span>
+        <div>
+          <p className="text-lg font-extrabold leading-tight">
+            {isOnline ? t('shift.online') : t('shift.offline')}
+          </p>
+          <p className="text-sm text-gray-500">
+            {isOnline ? t('shift.onlineDesc') : t('shift.offlineDesc')}
+          </p>
+        </div>
+      </div>
+
       <button
         onClick={() => onChange(!isOnline)}
         disabled={disabled}
-        style={{ ...btn, background: isOnline ? 'gray' : '#0a66c2' }}
+        className={`mt-4 ${isOnline ? 'btn-ghost' : 'btn-primary'}`}
       >
-        {isOnline ? 'Go Offline' : 'Go Online'}
+        {isOnline ? t('shift.goOffline') : t('shift.goOnline')}
       </button>
     </section>
   );
 }
-
-const card = { border: '1px solid #ddd', borderRadius: 8, padding: 16, marginBottom: 16 };
-const btn = { width: '100%', padding: 14, fontSize: 16, color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' };

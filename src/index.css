@@ -52,4 +52,21 @@
            disabled:opacity-50 disabled:cursor-not-allowed
            bg-full text-white hover:bg-rose-700;
   }
+/* Leaflet tweaks */
+.leaflet-popup-content-wrapper {
+  border-radius: 1rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  padding: 0;
+}
+.leaflet-popup-content {
+  margin: 14px 16px;
+  min-width: 190px;
+  font-family: var(--font-sans);
+}
+.leaflet-popup-close-button { display: none; }
+.leaflet-container { font-family: var(--font-sans); }
+.trk-marker { background: transparent !important; border: none !important; }    
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
 }

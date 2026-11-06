@@ -1,81 +1,93 @@
 import { useState } from 'react';
+import { useLang } from '../../context/LanguageContext';
 
 export default function PaymentSelector({ driver, onClose }) {
+  const { t } = useLang();
   const [mode, setMode] = useState(null); // 'cash' | 'qr'
 
+  const options = [
+    { value: 'cash', icon: '💵', label: t('pay.cash'), desc: t('pay.cashDesc') },
+    { value: 'qr', icon: '📱', label: t('pay.qr'), desc: t('pay.qrDesc') },
+  ];
+
   return (
-    <div style={overlay} onClick={onClose}>
-      <div style={sheet} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ margin: 0 }}>Paraan ng bayad</h3>
-          <button onClick={onClose}>✕</button>
+    <div
+      className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/50"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-t-[2rem] bg-white px-5 pb-8 pt-3 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-gray-300" />
+
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-extrabold">{t('pay.title')}</h3>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-lg"
+          >
+            ✕
+          </button>
         </div>
 
         {!driver ? (
-          <p style={{ color: 'crimson' }}>
-            Offline na ang driver na ito, kaya hindi na maipapakita ang detalye.
+          <p className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-full">
+            {t('pay.offline')}
           </p>
         ) : (
           <>
-            <p style={{ margin: '8px 0' }}>
-              Tricycle <strong>{driver.tricycle_plate_number}</strong>
-            </p>
-
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-              <button
-                onClick={() => setMode('cash')}
-                style={{ ...btn, background: mode === 'cash' ? '#16a34a' : '#555' }}
-              >
-                💵 Cash
-              </button>
-              <button
-                onClick={() => setMode('qr')}
-                style={{ ...btn, background: mode === 'qr' ? '#0a66c2' : '#555' }}
-              >
-                📱 E-wallet (QR)
-              </button>
+            <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-brand-soft px-3 py-2">
+              <span>🛺</span>
+              <span className="font-extrabold tracking-widest">{driver.tricycle_plate_number}</span>
             </div>
 
-            {mode === 'cash' && (
-              <p>Magbayad nang cash sa driver pagdating sa destinasyon. Ihanda ang barya.</p>
-            )}
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              {options.map((o) => {
+                const active = mode === o.value;
+                return (
+                  <button
+                    key={o.value}
+                    onClick={() => setMode(o.value)}
+                    className={`rounded-2xl border-2 p-3 text-left transition ${
+                      active ? 'border-brand-dark bg-brand-soft' : 'border-gray-200 bg-white'
+                    }`}
+                  >
+                    <div className="text-2xl">{o.icon}</div>
+                    <div className="mt-1 font-bold">{o.label}</div>
+                    <div className="text-xs text-gray-500">{o.desc}</div>
+                  </button>
+                );
+              })}
+            </div>
 
-            {mode === 'qr' &&
-              (driver.qr_code_url ? (
-                <div style={{ textAlign: 'center' }}>
-                  <img
-                    src={driver.qr_code_url}
-                    alt="QR code ng driver"
-                    style={{ width: '100%', maxWidth: 280 }}
-                  />
-                  <p style={{ fontSize: 13, color: '#555' }}>
-                    I-scan gamit ang GCash o ibang e-wallet. Ipakita sa driver ang resibo
-                    pagkatapos magbayad.
+            <div className="mt-4">
+              {mode === 'cash' && (
+                <p className="rounded-xl bg-green-50 px-4 py-3 text-sm text-gray-700">{t('pay.cashInfo')}</p>
+              )}
+
+              {mode === 'qr' &&
+                (driver.qr_code_url ? (
+                  <div className="text-center">
+                    <img
+                      src={driver.qr_code_url}
+                      alt="Driver QR code"
+                      className="mx-auto w-full max-w-[260px] rounded-2xl border border-gray-200 p-3"
+                    />
+                    <p className="mt-3 text-sm text-gray-600">{t('pay.qrInfo')}</p>
+                  </div>
+                ) : (
+                  <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700">
+                    {t('pay.noQr')}
                   </p>
-                </div>
-              ) : (
-                <p style={{ color: '#b45309' }}>
-                  Wala pang QR ang driver na ito. Cash na lang muna.
-                </p>
-              ))}
+                ))}
 
-            {!mode && <p style={{ color: '#777' }}>Pumili ng paraan ng bayad sa itaas.</p>}
+              {!mode && <p className="text-center text-sm text-gray-400">{t('pay.choose')}</p>}
+            </div>
           </>
         )}
       </div>
     </div>
   );
 }
-
-const overlay = {
-  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-  display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 2000,
-};
-const sheet = {
-  background: '#fff', width: '100%', maxWidth: 420, maxHeight: '85vh',
-  overflowY: 'auto', padding: 16, borderRadius: '12px 12px 0 0',
-};
-const btn = {
-  flex: 1, padding: 12, fontSize: 15, color: '#fff',
-  border: 'none', borderRadius: 8, cursor: 'pointer',
-};

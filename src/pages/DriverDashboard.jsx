@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLang } from '../context/LanguageContext';
 import { getMyDriver, updateDriver, uploadQr } from '../services/driverService';
 import { getSheds } from '../services/mapService';
 import StatusToggle from '../components/Driver/StatusToggle';
 import ShiftSwitch from '../components/Driver/ShiftSwitch';
 import QrUpload from '../components/Driver/QrUpload';
+import DriverHeader from '../components/Driver/DriverHeader';
 
 const USE_REAL_GPS = import.meta.env.VITE_USE_REAL_GPS === 'true';
 
 export default function DriverDashboard() {
   const { session, signOut } = useAuth();
+  const { t } = useLang();
   const userId = session.user.id;
 
   const [driver, setDriver] = useState(null);
@@ -72,62 +75,88 @@ export default function DriverDashboard() {
     );
   }
 
-  if (loading) return <p style={{ padding: 16 }}>Loading…</p>;
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-brand-soft">
+        <div className="flex items-center gap-3 text-ink/70">
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-brand-dark border-t-transparent" />
+          {t('driver.loading')}
+        </div>
+      </div>
+    );
+  }
+
   if (!driver) {
     return (
-      <div style={{ padding: 16 }}>
-        <p style={{ color: 'crimson' }}>{error || 'Walang driver profile para sa account na ito.'}</p>
-        <button onClick={signOut}>Sign out</button>
+      <div className="mx-auto min-h-screen max-w-md bg-brand-soft p-4">
+        <div className="card space-y-4">
+          <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-full">
+            {error || t('driver.noProfile')}
+          </p>
+          <button onClick={signOut} className="btn-dark">{t('common.signOut')}</button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: 480, margin: '0 auto', padding: 16 }}>
-      <h2>Driver Dashboard</h2>
-      <p>Plate: <strong>{driver.tricycle_plate_number}</strong></p>
+    <div className="min-h-screen bg-brand-soft pb-10">
+      <DriverHeader plate={driver.tricycle_plate_number} />
 
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
+      <main className="mx-auto -mt-1 max-w-md space-y-4 px-4">
+        {error && (
+          <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-full">{error}</p>
+        )}
 
-      <ShiftSwitch
-        isOnline={driver.is_online}
-        disabled={busy}
-        onChange={(v) => run(() => updateDriver(userId, { is_online: v }))}
-      />
-      <StatusToggle
-        status={driver.status}
-        disabled={busy}
-        onChange={(s) => run(() => updateDriver(userId, { status: s }))}
-      />
+        <ShiftSwitch
+          isOnline={driver.is_online}
+          disabled={busy}
+          onChange={(v) => run(() => updateDriver(userId, { is_online: v }))}
+        />
 
-      {!USE_REAL_GPS && (
-        <section style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16, marginBottom: 16 }}>
-          <h3 style={{ marginTop: 0 }}>Demo location</h3>
-          <p style={{ fontSize: 13, color: '#555' }}>
-            Naka-off ang totoong GPS. Pumili ng terminal kung saan ilalagay ang tricycle mo sa mapa.
-          </p>
-          <select value={spot} onChange={handlePickSpot} disabled={busy} style={{ width: '100%', padding: 8 }}>
-            <option value="">Pumili ng terminal…</option>
-            {sheds.map((s) => (
-              <option key={s.id} value={s.id}>{s.shed_name}</option>
-            ))}
-          </select>
-          <p style={{ fontSize: 13 }}>
-            Kasalukuyan:{' '}
-            {driver.current_latitude
-              ? `${Number(driver.current_latitude).toFixed(4)}, ${Number(driver.current_longitude).toFixed(4)}`
-              : 'wala pa'}
-          </p>
-        </section>
-      )}
+        <StatusToggle
+          status={driver.status}
+          disabled={busy}
+          onChange={(s) => run(() => updateDriver(userId, { status: s }))}
+        />
 
-      <QrUpload
-        qrUrl={driver.qr_code_url}
-        disabled={busy}
-        onUpload={(file) => run(() => uploadQr(userId, file))}
-      />
+        {!USE_REAL_GPS && (
+          <section className="card">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">📍</span>
+              <h3 className="text-base font-extrabold">{t('demo.title')}</h3>
+            </div>
+            <p className="mt-1 text-sm text-gray-500">{t('demo.desc')}</p>
+            <select
+              value={spot}
+              onChange={handlePickSpot}
+              disabled={busy}
+              className="input mt-3 appearance-none"
+            >
+              <option value="">{t('demo.pick')}</option>
+              {sheds.map((s) => (
+                <option key={s.id} value={s.id}>{s.shed_name}</option>
+              ))}
+            </select>
+            <p className="mt-3 text-xs text-gray-500">
+              {t('demo.current')}:{' '}
+              <span className="font-semibold text-ink">
+                {driver.current_latitude
+                  ? `${Number(driver.current_latitude).toFixed(4)}, ${Number(driver.current_longitude).toFixed(4)}`
+                  : t('demo.none')}
+              </span>
+            </p>
+          </section>
+        )}
 
-      <button onClick={signOut} style={{ marginTop: 8 }}>Sign out</button>
+        <QrUpload
+          qrUrl={driver.qr_code_url}
+          disabled={busy}
+          onUpload={(file) => run(() => uploadQr(userId, file))}
+        />
+
+        <button onClick={signOut} className="btn-ghost">{t('common.signOut')}</button>
+      </main>
     </div>
   );
 }

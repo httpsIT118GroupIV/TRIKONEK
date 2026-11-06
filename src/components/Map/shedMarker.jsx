@@ -1,32 +1,33 @@
-import { CircleMarker, Popup } from 'react-leaflet';
+import { Marker, Popup } from 'react-leaflet';
+import { useLang } from '../../context/LanguageContext';
+import { shedIcon } from './icons';
 
 export default function ShedMarker({ shed, waiting, busy, onSignal, onCancel }) {
+  const { t } = useLang();
+
   return (
-    <CircleMarker
-      center={[shed.latitude, shed.longitude]}
-      radius={9}
-      pathOptions={{
-        color: '#fff',
-        weight: 3,
-        fillColor: waiting ? '#f59e0b' : '#2563eb',
-        fillOpacity: 1,
-      }}
-    >
+    <Marker position={[shed.latitude, shed.longitude]} icon={shedIcon(waiting)}>
       <Popup>
-        <strong>{shed.shed_name}</strong>
-        <br />
-        <small>{shed.route_zone}</small>
-        <br />
+        <p className="text-base font-extrabold leading-tight">{shed.shed_name}</p>
+        {shed.route_zone && <p className="mt-0.5 text-xs text-gray-500">{shed.route_zone}</p>}
         {waiting ? (
-          <button disabled={busy} onClick={onCancel} style={{ marginTop: 8 }}>
-            Cancel signal
+          <button
+            disabled={busy}
+            onClick={onCancel}
+            className="mt-3 w-full rounded-full border border-gray-300 bg-white py-2.5 text-sm font-bold text-ink disabled:opacity-50"
+          >
+            {t('map.cancelSignal')}
           </button>
         ) : (
-          <button disabled={busy} onClick={onSignal} style={{ marginTop: 8 }}>
-            May naghihintay dito
+          <button
+            disabled={busy}
+            onClick={onSignal}
+            className="mt-3 w-full rounded-full bg-brand py-2.5 text-sm font-bold text-ink disabled:opacity-50 active:scale-[0.98]"
+          >
+            🙋 {t('map.signal')}
           </button>
         )}
       </Popup>
-    </CircleMarker>
+    </Marker>
   );
 }
