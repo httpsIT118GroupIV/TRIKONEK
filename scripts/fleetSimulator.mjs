@@ -116,6 +116,7 @@ async function ensureDriver(plate) {
     .eq('tricycle_plate_number', plate)
     .single();
   if (e2) throw e2;
+  await sb.from('drivers').update({ verification_status: 'verified' }).eq('id', data.id);
   return data.id;
 }
 

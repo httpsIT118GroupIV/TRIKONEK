@@ -1,14 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { supabase } from '../services/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { useLang } from '../context/LanguageContext';
 import { getMyDriver, updateDriver, uploadQr } from '../services/driverService';
-import { getSheds } from '../services/mapService';
+import { getSheds, getActiveSignals } from '../services/mapService';
+import { distanceM, formatDistance } from '../utils/geo';
+import { alertDriver, unlockAudio } from '../utils/alerts';
+import useWakeLock from '../hooks/useWakeLock';
 import StatusToggle from '../components/Driver/StatusToggle';
 import ShiftSwitch from '../components/Driver/ShiftSwitch';
 import QrUpload from '../components/Driver/QrUpload';
 import DriverHeader from '../components/Driver/DriverHeader';
+import DriverMap from '../components/Driver/DriverMap';
 
 const USE_REAL_GPS = import.meta.env.VITE_USE_REAL_GPS === 'true';
+const ALERT_M = 500;          // beep kapag ganito na kalapit ang naghihintay
+const MOVING_KMH = 10;        // mas mabilis dito = naka-lock ang Available/Full
 
 export default function DriverDashboard() {
   const { session, signOut } = useAuth();
@@ -17,10 +24,13 @@ export default function DriverDashboard() {
 
   const [driver, setDriver] = useState(null);
   const [sheds, setSheds] = useState([]);
+  const [signals, setSignals] = useState([]);
+  const [gps, setGps] = useState(null); // { pos: [lat, lng], speed: m/s | null }
   const [spot, setSpot] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const alerted = useRef(new Set());
 
   useEffect(() => {
     getMyDriver(userId)
@@ -30,12 +40,21 @@ export default function DriverDashboard() {
     getSheds().then(setSheds).catch(() => {});
   }, [userId]);
 
+  const isOnline = !!driver?.is_online;
+  const verified = driver?.verification_status === 'verified';
+
+  useWakeLock(isOnline);
+
   // Totoong GPS: gagana lang kapag VITE_USE_REAL_GPS=true
   useEffect(() => {
-    if (!USE_REAL_GPS || !driver?.is_online || !navigator.geolocation) return;
+    if (!USE_REAL_GPS || !isOnline || !navigator.geolocation) return;
     let last = 0;
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
+        setGps({
+          pos: [pos.coords.latitude, pos.coords.longitude],
+          speed: pos.coords.speed,
+        });
         const now = Date.now();
         if (now - last < 5000) return;
         last = now;
@@ -48,7 +67,77 @@ export default function DriverDashboard() {
       { enableHighAccuracy: true }
     );
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [driver?.is_online, userId]);
+  }, [isOnline, userId]);
+
+  // Mga naghihintay: realtime at polling. Kapag Offline, wala nang makikita.
+  useEffect(() => {
+    if (!isOnline) {
+      setSignals([]);
+      return;
+    }
+    const load = () => getActiveSignals().then(setSignals).catch(() => {});
+    load();
+    const channel = supabase
+      .channel('signals-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'commuter_signals' }, load)
+      .subscribe();
+    const timer = setInterval(load, 5000);
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(timer);
+    };
+  }, [isOnline]);
+
+  // Kasalukuyang posisyon: GPS kung meron, kung wala ay ang nasa database (demo)
+  const me = useMemo(() => {
+    if (gps?.pos) return gps.pos;
+    if (driver?.current_latitude != null && driver?.current_longitude != null) {
+      return [Number(driver.current_latitude), Number(driver.current_longitude)];
+    }
+    return null;
+  }, [gps, driver?.current_latitude, driver?.current_longitude]);
+
+  const waiting = useMemo(
+    () =>
+      signals
+        .map((s) => {
+          if (s.shed_id) {
+            const sh = sheds.find((x) => x.id === s.shed_id);
+            return sh
+              ? { id: s.id, kind: 'terminal', shedId: sh.id, name: sh.shed_name, lat: Number(sh.latitude), lng: Number(sh.longitude) }
+              : null;
+          }
+          if (s.latitude == null || s.longitude == null) return null;
+          return { id: s.id, kind: 'roadside', lat: Number(s.latitude), lng: Number(s.longitude) };
+        })
+        .filter(Boolean),
+    [signals, sheds]
+  );
+
+  const nearest = useMemo(() => {
+    if (!me || !waiting.length) return null;
+    let best = null;
+    for (const w of waiting) {
+      const d = distanceM(me, [w.lat, w.lng]);
+      if (!best || d < best.d) best = { ...w, d };
+    }
+    return best;
+  }, [me, waiting]);
+
+  // Beep at vibration, isang beses lang kada naghihintay
+  useEffect(() => {
+    if (!me) return;
+    for (const w of waiting) {
+      if (alerted.current.has(w.id)) continue;
+      if (distanceM(me, [w.lat, w.lng]) <= ALERT_M) {
+        alerted.current.add(w.id);
+        alertDriver();
+      }
+    }
+  }, [me, waiting]);
+
+  const kmh = gps?.speed != null ? gps.speed * 3.6 : 0;
+  const moving = kmh > MOVING_KMH;
 
   async function run(action) {
     setBusy(true);
@@ -63,10 +152,12 @@ export default function DriverDashboard() {
   }
 
   function handlePickSpot(e) {
+    unlockAudio();
     const id = e.target.value;
     setSpot(id);
     const shed = sheds.find((s) => s.id === id);
     if (!shed) return;
+    setGps(null);
     run(() =>
       updateDriver(userId, {
         current_latitude: shed.latitude,
@@ -99,6 +190,28 @@ export default function DriverDashboard() {
     );
   }
 
+  // Ang nakikita sa ibabaw ng mapa
+  let banner;
+  if (nearest) {
+    banner = (
+      <div className="rounded-2xl bg-amber-500 px-4 py-3 text-white shadow-lg">
+        <p className="text-lg font-extrabold leading-tight">
+          🧍 {t('drv.waiting')} · {t('drv.away').replace('{d}', formatDistance(nearest.d))}
+        </p>
+        <p className="text-xs font-semibold text-white/90">
+          {nearest.kind === 'terminal' ? nearest.name : t('drv.roadside')}
+          {waiting.length > 1 && ` · ${t('drv.total').replace('{n}', waiting.length)}`}
+        </p>
+      </div>
+    );
+  } else {
+    banner = (
+      <div className="inline-block rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-gray-600 shadow">
+        {isOnline ? t('drv.none') : t('drv.goOnlineMap')}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-brand-soft pb-10">
       <DriverHeader plate={driver.tricycle_plate_number} />
@@ -108,15 +221,39 @@ export default function DriverDashboard() {
           <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-full">{error}</p>
         )}
 
+        {!verified && (
+          <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-accent">
+            {t('verify.notVerified')}
+          </p>
+        )}
+
+        <DriverMap
+          sheds={sheds}
+          waiting={waiting}
+          me={me}
+          banner={banner}
+          recenterLabel={t('drv.center')}
+          meLabel={t('drv.me')}
+        />
+
         <ShiftSwitch
           isOnline={driver.is_online}
-          disabled={busy}
-          onChange={(v) => run(() => updateDriver(userId, { is_online: v }))}
+          disabled={busy || !verified}
+          onChange={(v) => {
+            if (v) unlockAudio();
+            run(() => updateDriver(userId, { is_online: v }));
+          }}
         />
+
+        {moving && (
+          <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-accent">
+            🛑 {t('drv.stopFirst')}
+          </p>
+        )}
 
         <StatusToggle
           status={driver.status}
-          disabled={busy}
+          disabled={busy || moving}
           onChange={(s) => run(() => updateDriver(userId, { status: s }))}
         />
 

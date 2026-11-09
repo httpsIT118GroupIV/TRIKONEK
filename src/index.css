@@ -68,5 +68,5 @@
 .trk-marker { background: transparent !important; border: none !important; }    
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
-
+.leaflet-bottom { margin-bottom: 84px; }
 }

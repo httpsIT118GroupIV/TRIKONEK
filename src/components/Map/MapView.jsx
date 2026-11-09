@@ -23,8 +23,8 @@ function BoundsLock({ sheds }) {
   return null;
 }
 
-export default function MapView({ sheds, drivers, waitingByShed, busy, onSignal, onCancel, onPay }) {
-  return (
+   export default function MapView({ sheds, drivers, waitingByShed, busy, onSignal, onCancel, onPay, extra }) {
+return (
     <MapContainer
       center={CENTER}
       zoom={13}
@@ -52,6 +52,7 @@ export default function MapView({ sheds, drivers, waitingByShed, busy, onSignal,
       {drivers.map((d) => (
         <TricycleMarker key={d.id} driver={d} onPay={onPay} />
       ))}
+      {extra}
     </MapContainer>
   );
 }
