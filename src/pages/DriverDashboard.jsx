@@ -2,20 +2,23 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { useLang } from '../context/LanguageContext';
-import { getMyDriver, updateDriver, uploadQr } from '../services/driverService';
+import { getMyDriver, updateDriver } from '../services/driverService';
 import { getSheds, getActiveSignals } from '../services/mapService';
-import { distanceM, formatDistance } from '../utils/geo';
+import {
+  driverOpenRequests, driverActiveRequest, acceptRequest, releaseRequest, completeRequest, rideErrorKey,
+} from '../services/rideService';
+import { formatDistance } from '../utils/geo';
 import { alertDriver, unlockAudio } from '../utils/alerts';
 import useWakeLock from '../hooks/useWakeLock';
 import StatusToggle from '../components/Driver/StatusToggle';
 import ShiftSwitch from '../components/Driver/ShiftSwitch';
 import DriverHeader from '../components/Driver/DriverHeader';
-import DriverMap from '../components/Driver/DriverMap';
 import ProfileCard from '../components/Driver/ProfileCard';
+import DriverMap from '../components/Driver/DriverMap';
+import DriverRequests from '../components/Driver/DriverRequests';
 
 const USE_REAL_GPS = import.meta.env.VITE_USE_REAL_GPS === 'true';
-const ALERT_M = 500;          // beep kapag ganito na kalapit ang naghihintay
-const MOVING_KMH = 10;        // mas mabilis dito = naka-lock ang Available/Full
+const MOVING_KMH = 10; // mas mabilis dito = naka-lock ang Accept at Available/Full
 
 export default function DriverDashboard() {
   const { session, signOut } = useAuth();
@@ -25,12 +28,14 @@ export default function DriverDashboard() {
   const [driver, setDriver] = useState(null);
   const [sheds, setSheds] = useState([]);
   const [signals, setSignals] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [active, setActive] = useState(null);
   const [gps, setGps] = useState(null); // { pos: [lat, lng], speed: m/s | null }
   const [spot, setSpot] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const alerted = useRef(new Set());
+  const seen = useRef(new Set());
 
   useEffect(() => {
     getMyDriver(userId)
@@ -51,10 +56,7 @@ export default function DriverDashboard() {
     let last = 0;
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        setGps({
-          pos: [pos.coords.latitude, pos.coords.longitude],
-          speed: pos.coords.speed,
-        });
+        setGps({ pos: [pos.coords.latitude, pos.coords.longitude], speed: pos.coords.speed });
         const now = Date.now();
         if (now - last < 5000) return;
         last = now;
@@ -69,7 +71,29 @@ export default function DriverDashboard() {
     return () => navigator.geolocation.clearWatch(watchId);
   }, [isOnline, userId]);
 
-  // Mga naghihintay: realtime at polling. Kapag Offline, wala nang makikita.
+  // Mga request: bawat 3 segundo. Ang aktibong sundo ay tinitingnan kahit Offline.
+  useEffect(() => {
+    if (!verified) {
+      setRequests([]);
+      setActive(null);
+      return;
+    }
+    let stop = false;
+    const load = async () => {
+      try {
+        const [open, act] = await Promise.all([
+          isOnline ? driverOpenRequests() : Promise.resolve([]),
+          driverActiveRequest(),
+        ]);
+        if (!stop) { setRequests(open ?? []); setActive(act ?? null); }
+      } catch { /* ignore */ }
+    };
+    load();
+    const timer = setInterval(load, 3000);
+    return () => { stop = true; clearInterval(timer); };
+  }, [isOnline, verified]);
+
+  // Mga naghihintay sa terminal (pasibo): bilang lang
   useEffect(() => {
     if (!isOnline) {
       setSignals([]);
@@ -88,7 +112,16 @@ export default function DriverDashboard() {
     };
   }, [isOnline]);
 
-  // Kasalukuyang posisyon: GPS kung meron, kung wala ay ang nasa database (demo)
+  // Beep at vibration kapag may bagong request, isang beses bawat request
+  useEffect(() => {
+    for (const r of requests) {
+      if (!seen.current.has(r.id)) {
+        seen.current.add(r.id);
+        alertDriver();
+      }
+    }
+  }, [requests]);
+
   const me = useMemo(() => {
     if (gps?.pos) return gps.pos;
     if (driver?.current_latitude != null && driver?.current_longitude != null) {
@@ -100,41 +133,16 @@ export default function DriverDashboard() {
   const waiting = useMemo(
     () =>
       signals
+        .filter((s) => s.shed_id)
         .map((s) => {
-          if (s.shed_id) {
-            const sh = sheds.find((x) => x.id === s.shed_id);
-            return sh
-              ? { id: s.id, kind: 'terminal', shedId: sh.id, name: sh.shed_name, lat: Number(sh.latitude), lng: Number(sh.longitude) }
-              : null;
-          }
-          if (s.latitude == null || s.longitude == null) return null;
-          return { id: s.id, kind: 'roadside', lat: Number(s.latitude), lng: Number(s.longitude) };
+          const sh = sheds.find((x) => x.id === s.shed_id);
+          return sh
+            ? { id: s.id, kind: 'terminal', shedId: sh.id, name: sh.shed_name, lat: Number(sh.latitude), lng: Number(sh.longitude) }
+            : null;
         })
         .filter(Boolean),
     [signals, sheds]
   );
-
-  const nearest = useMemo(() => {
-    if (!me || !waiting.length) return null;
-    let best = null;
-    for (const w of waiting) {
-      const d = distanceM(me, [w.lat, w.lng]);
-      if (!best || d < best.d) best = { ...w, d };
-    }
-    return best;
-  }, [me, waiting]);
-
-  // Beep at vibration, isang beses lang kada naghihintay
-  useEffect(() => {
-    if (!me) return;
-    for (const w of waiting) {
-      if (alerted.current.has(w.id)) continue;
-      if (distanceM(me, [w.lat, w.lng]) <= ALERT_M) {
-        alerted.current.add(w.id);
-        alertDriver();
-      }
-    }
-  }, [me, waiting]);
 
   const kmh = gps?.speed != null ? gps.speed * 3.6 : 0;
   const moving = kmh > MOVING_KMH;
@@ -146,6 +154,39 @@ export default function DriverDashboard() {
       setDriver(await action());
     } catch (e) {
       setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const rideErr = (e) => {
+    const k = rideErrorKey(e.message);
+    setError(k ? t(k) : e.message);
+  };
+
+  async function accept(id) {
+    setBusy(true);
+    setError('');
+    try {
+      setActive(await acceptRequest(id));
+      setRequests([]);
+    } catch (e) {
+      rideErr(e);
+      setRequests(await driverOpenRequests().catch(() => []));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function finish(fn, id) {
+    setBusy(true);
+    setError('');
+    try {
+      await fn(id);
+      setActive(null);
+      setRequests(await driverOpenRequests().catch(() => []));
+    } catch (e) {
+      rideErr(e);
     } finally {
       setBusy(false);
     }
@@ -190,24 +231,32 @@ export default function DriverDashboard() {
     );
   }
 
-  // Ang nakikita sa ibabaw ng mapa
+  // Ang makikita sa ibabaw ng mapa
   let banner;
-  if (nearest) {
+  if (active) {
     banner = (
       <div className="rounded-2xl bg-amber-500 px-4 py-3 text-white shadow-lg">
         <p className="text-lg font-extrabold leading-tight">
-          🧍 {t('drv.waiting')} · {t('drv.away').replace('{d}', formatDistance(nearest.d))}
+          🧍 {t('drv.pickingUp').replace('{name}', active.commuter_first_name || '')}
+        </p>
+        <p className="text-xs font-semibold text-white/90">{t('drv.toDest').replace('{name}', active.dest_name)}</p>
+      </div>
+    );
+  } else if (requests.length) {
+    banner = (
+      <div className="rounded-2xl bg-amber-500 px-4 py-3 text-white shadow-lg">
+        <p className="text-lg font-extrabold leading-tight">
+          🧍 {t('drv.reqNearby')} · {formatDistance(requests[0].distance_m)}
         </p>
         <p className="text-xs font-semibold text-white/90">
-          {nearest.kind === 'terminal' ? nearest.name : t('drv.roadside')}
-          {waiting.length > 1 && ` · ${t('drv.total').replace('{n}', waiting.length)}`}
+          {t('drv.reqCount').replace('{n}', requests.length)}
         </p>
       </div>
     );
   } else {
     banner = (
       <div className="inline-block rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-gray-600 shadow">
-        {isOnline ? t('drv.none') : t('drv.goOnlineMap')}
+        {isOnline ? t('drv.reqNone') : t('drv.goOnlineMap')}
       </div>
     );
   }
@@ -226,14 +275,30 @@ export default function DriverDashboard() {
             {t('verify.notVerified')}
           </p>
         )}
+
         <ProfileCard driver={driver} />
+
         <DriverMap
           sheds={sheds}
           waiting={waiting}
+          requests={requests}
+          pickup={active ? [Number(active.pickup_lat), Number(active.pickup_lng)] : null}
           me={me}
           banner={banner}
           recenterLabel={t('drv.center')}
           meLabel={t('drv.me')}
+        />
+
+        <DriverRequests
+          active={active}
+          requests={requests}
+          isOnline={isOnline}
+          isFull={driver.status === 'full'}
+          moving={moving}
+          busy={busy}
+          onAccept={accept}
+          onRelease={(id) => finish(releaseRequest, id)}
+          onComplete={(id) => finish(completeRequest, id)}
         />
 
         <ShiftSwitch
@@ -264,12 +329,7 @@ export default function DriverDashboard() {
               <h3 className="text-base font-extrabold">{t('demo.title')}</h3>
             </div>
             <p className="mt-1 text-sm text-gray-500">{t('demo.desc')}</p>
-            <select
-              value={spot}
-              onChange={handlePickSpot}
-              disabled={busy}
-              className="input mt-3 appearance-none"
-            >
+            <select value={spot} onChange={handlePickSpot} disabled={busy} className="input mt-3 appearance-none">
               <option value="">{t('demo.pick')}</option>
               {sheds.map((s) => (
                 <option key={s.id} value={s.id}>{s.shed_name}</option>
