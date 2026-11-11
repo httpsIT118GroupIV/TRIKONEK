@@ -1,8 +1,12 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
+import { useAuth } from '../context/AuthContext';
 import { useLang } from '../context/LanguageContext';
 import LanguageToggle from '../components/common/LanguageToggle';
+import PasswordInput from '../components/common/PasswordInput';
+import { HOME } from '../utils/roleHome';
+import { authErrorKey } from '../utils/authErrors';
 
 const DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
 const DEMO_PASSWORD = 'Demo12345!';
@@ -12,26 +16,36 @@ const DEMO_ACCOUNTS = {
 };
 
 export default function Login() {
-  const nav = useNavigate();
+  const { session, role, loading: authLoading } = useAuth();
   const { t } = useLang();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Kapag handa na ang session at role, kusang pupunta sa tamang screen
+  if (!authLoading && session) {
+    return <Navigate to={role ? HOME[role] : '/'} replace />;
+  }
 
   async function signIn(em, pw) {
     setError('');
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: em, password: pw });
-    setLoading(false);
-    if (error) return setError(error.message);
-    nav('/');
+    setSubmitting(true);
+    const { error } = await supabase.auth.signInWithPassword({ email: em.trim(), password: pw });
+    if (error) {
+      setSubmitting(false);
+      const k = authErrorKey(error.message);
+      return setError(k ? t(k) : error.message);
+    }
+    // Hindi na mag-navigate dito: ang redirect sa itaas ang bahala
   }
 
   function handleSubmit(e) {
     e.preventDefault();
     signIn(email, password);
   }
+
+  const busy = submitting || authLoading;
 
   return (
     <div className="min-h-screen bg-brand flex flex-col">
@@ -57,16 +71,16 @@ export default function Login() {
             </div>
             <div>
               <label className="label" htmlFor="password">{t('field.password')}</label>
-              <input id="password" type="password" className="input" placeholder="••••••"
-                value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
+              <PasswordInput id="password" value={password}
+                onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
             </div>
 
             {error && (
               <p className="rounded-xl bg-rose-50 text-full text-sm font-medium px-4 py-3">{error}</p>
             )}
 
-            <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? t('login.loading') : t('login.button')}
+            <button type="submit" className="btn-primary" disabled={busy}>
+              {busy ? t('login.loading') : t('login.button')}
             </button>
 
             <p className="text-center text-sm text-gray-600 pt-2">
@@ -82,11 +96,11 @@ export default function Login() {
               <p className="text-sm font-bold">Demo mode</p>
               <p className="text-xs text-gray-500 mt-0.5 mb-3">Isang click lang, walang kailangang i-type.</p>
               <div className="grid grid-cols-2 gap-3">
-                <button type="button" className="btn-ghost" disabled={loading}
+                <button type="button" className="btn-ghost" disabled={busy}
                   onClick={() => signIn(DEMO_ACCOUNTS.commuter, DEMO_PASSWORD)}>
                   View as Commuter
                 </button>
-                <button type="button" className="btn-dark" disabled={loading}
+                <button type="button" className="btn-dark" disabled={busy}
                   onClick={() => signIn(DEMO_ACCOUNTS.driver, DEMO_PASSWORD)}>
                   View as Driver
                 </button>

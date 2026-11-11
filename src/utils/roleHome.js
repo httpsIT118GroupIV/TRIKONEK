@@ -1,0 +1,1 @@
+export const HOME = { commuter: '/commuter', driver: '/driver', admin: '/admin' };

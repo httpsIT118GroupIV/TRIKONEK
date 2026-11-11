@@ -1,22 +1,39 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { useLang } from './context/LanguageContext';
 import ProtectedRoute from './components/common/ProtectedRoute';
+import { HOME } from './utils/roleHome';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import CommuterHome from './pages/CommuterHome';
 import DriverDashboard from './pages/DriverDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import Profile from './pages/Profile';
-import Faq from './pages/Faq'; 
-
-
-const HOME = { commuter: '/commuter', driver: '/driver', admin: '/admin' };
+import Faq from './pages/Faq';
 
 function RoleRedirect() {
-  const { session, role, loading } = useAuth();
-  if (loading) return <p>Loading…</p>;
+  const { session, role, loading, signOut } = useAuth();
+  const { t } = useLang();
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-brand-soft">
+        <span className="h-6 w-6 animate-spin rounded-full border-2 border-brand-dark border-t-transparent" />
+      </div>
+    );
+  }
   if (!session) return <Navigate to="/login" replace />;
-  return <Navigate to={HOME[role] ?? '/login'} replace />;
+  if (!role) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-brand-soft p-4">
+        <div className="card max-w-md space-y-4">
+          <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-full">{t('auth.noProfile')}</p>
+          <button onClick={signOut} className="btn-dark">{t('common.signOut')}</button>
+        </div>
+      </div>
+    );
+  }
+  return <Navigate to={HOME[role]} replace />;
 }
 
 export default function App() {
