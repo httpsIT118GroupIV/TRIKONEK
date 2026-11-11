@@ -6,6 +6,9 @@ import Register from './pages/Register';
 import CommuterHome from './pages/CommuterHome';
 import DriverDashboard from './pages/DriverDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import Profile from './pages/Profile';
+import Faq from './pages/Faq'; 
+
 
 const HOME = { commuter: '/commuter', driver: '/driver', admin: '/admin' };
 
@@ -27,6 +30,8 @@ export default function App() {
           <Route path="/commuter" element={<ProtectedRoute allow={['commuter']}><CommuterHome /></ProtectedRoute>} />
           <Route path="/driver" element={<ProtectedRoute allow={['driver']}><DriverDashboard /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute allow={['admin']}><AdminDashboard /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute allow={['commuter', 'driver', 'admin']}><Profile /></ProtectedRoute>} />
+          <Route path="/faq" element={<ProtectedRoute allow={['commuter', 'driver', 'admin']}><Faq /></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

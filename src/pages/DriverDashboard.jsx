@@ -9,9 +9,9 @@ import { alertDriver, unlockAudio } from '../utils/alerts';
 import useWakeLock from '../hooks/useWakeLock';
 import StatusToggle from '../components/Driver/StatusToggle';
 import ShiftSwitch from '../components/Driver/ShiftSwitch';
-import QrUpload from '../components/Driver/QrUpload';
 import DriverHeader from '../components/Driver/DriverHeader';
 import DriverMap from '../components/Driver/DriverMap';
+import ProfileCard from '../components/Driver/ProfileCard';
 
 const USE_REAL_GPS = import.meta.env.VITE_USE_REAL_GPS === 'true';
 const ALERT_M = 500;          // beep kapag ganito na kalapit ang naghihintay
@@ -226,7 +226,7 @@ export default function DriverDashboard() {
             {t('verify.notVerified')}
           </p>
         )}
-
+        <ProfileCard driver={driver} />
         <DriverMap
           sheds={sheds}
           waiting={waiting}
@@ -285,12 +285,6 @@ export default function DriverDashboard() {
             </p>
           </section>
         )}
-
-        <QrUpload
-          qrUrl={driver.qr_code_url}
-          disabled={busy}
-          onUpload={(file) => run(() => uploadQr(userId, file))}
-        />
 
         <button onClick={signOut} className="btn-ghost">{t('common.signOut')}</button>
       </main>

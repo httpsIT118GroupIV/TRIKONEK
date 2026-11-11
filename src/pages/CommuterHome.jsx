@@ -10,6 +10,7 @@ import MapView from '../components/Map/MapView';
 import RoadsideLayer from '../components/Map/RoadsideLayer';
 import PaymentSelector from '../components/Commuter/PaymentSelector';
 import LanguageToggle from '../components/common/LanguageToggle';
+import SideMenu from '../components/common/SideMenu';
 
 export default function CommuterHome() {
   const { session, signOut } = useAuth();
@@ -27,6 +28,7 @@ export default function CommuterHome() {
   const [picked, setPicked] = useState(null);
   const [locating, setLocating] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const refreshDrivers = useCallback(() => {
     getOnlineDrivers().then(setDrivers).catch((e) => setError(e.message));
@@ -186,16 +188,16 @@ export default function CommuterHome() {
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <LanguageToggle />
-                <button
-                  onClick={signOut}
-                  aria-label={t('common.signOut')}
-                  title={t('common.signOut')}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-ink text-sm text-white"
-                >
-                  ⎋
-                </button>
+              <button
+                onClick={() => setMenuOpen(true)}
+                aria-label={t('menu.open')}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-lg text-white"
+              >
+                ☰
+              </button>
               </div>
             </div>
+            <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
           </div>
 
           <div className="no-scrollbar flex gap-2 overflow-x-auto">
