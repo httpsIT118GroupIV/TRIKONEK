@@ -10,6 +10,8 @@ import DriverDashboard from './pages/DriverDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import Profile from './pages/Profile';
 import Faq from './pages/Faq';
+import Verify from './pages/Verify';
+import Sticker from './pages/Sticker';
 
 function RoleRedirect() {
   const { session, role, loading, signOut } = useAuth();
@@ -49,6 +51,8 @@ export default function App() {
           <Route path="/admin" element={<ProtectedRoute allow={['admin']}><AdminDashboard /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute allow={['commuter', 'driver', 'admin']}><Profile /></ProtectedRoute>} />
           <Route path="/faq" element={<ProtectedRoute allow={['commuter', 'driver', 'admin']}><Faq /></ProtectedRoute>} />
+          <Route path="/t/:plate" element={<Verify />} />
+          <Route path="/sticker/:plate" element={<ProtectedRoute allow={['driver', 'admin']}><Sticker /></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

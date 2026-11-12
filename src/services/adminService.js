@@ -34,3 +34,32 @@ export async function setLine(driverId, line) {
   const { error } = await supabase.from('drivers').update({ line }).eq('id', driverId);
   if (error) throw error;
 }
+export async function listFares() {
+  const { data, error } = await supabase.from('fares').select('id, shed_a, shed_b, regular');
+  if (error) throw error;
+  return data;
+}
+
+// Ang umiiral na row ay ina-update ayon sa id, at hindi nababago ang pagkakaayos ng shed_a at shed_b
+export async function saveFares({ updates, inserts }) {
+  if (updates.length) {
+    const { error } = await supabase.from('fares').upsert(updates);
+    if (error) throw error;
+  }
+  if (inserts.length) {
+    const { error } = await supabase.from('fares').insert(inserts);
+    if (error) throw error;
+  }
+}
+
+export async function getSettings() {
+  const { data, error } = await supabase.from('app_settings').select('key, value');
+  if (error) throw error;
+  return Object.fromEntries(data.map((r) => [r.key, r.value]));
+}
+
+export async function saveSettings(obj) {
+  const rows = Object.entries(obj).map(([key, value]) => ({ key, value: String(value) }));
+  const { error } = await supabase.from('app_settings').upsert(rows, { onConflict: 'key' });
+  if (error) throw error;
+}

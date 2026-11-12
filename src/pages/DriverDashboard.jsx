@@ -16,6 +16,7 @@ import DriverHeader from '../components/Driver/DriverHeader';
 import ProfileCard from '../components/Driver/ProfileCard';
 import DriverMap from '../components/Driver/DriverMap';
 import DriverRequests from '../components/Driver/DriverRequests';
+import TodayTrips from '../components/Driver/TodayTrips';
 
 const USE_REAL_GPS = import.meta.env.VITE_USE_REAL_GPS === 'true';
 const MOVING_KMH = 10; // mas mabilis dito = naka-lock ang Accept at Available/Full
@@ -277,6 +278,7 @@ export default function DriverDashboard() {
         )}
 
         <ProfileCard driver={driver} />
+        <TodayTrips />
 
         <DriverMap
           sheds={sheds}

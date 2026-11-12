@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useLang } from '../../context/LanguageContext';
+import { Link } from 'react-router-dom';
 
 const LINES = ['libon_local', 'direct_polangui', 'libon_polangui'];
 
@@ -77,16 +78,16 @@ export default function DriverReviewCard({ d, busy, onApprove, onReject, onRevok
         </div>
       )}
 
-      {status === 'pending' && (
-        <>
-          {!line && <p className="text-xs text-accent">{t('admin.needLine')}</p>}
-          <div className="grid grid-cols-2 gap-3">
-            <button className="btn-ghost" disabled={busy} onClick={onReject}>{t('admin.reject')}</button>
-            <button className="btn-primary" disabled={busy || !line} onClick={() => onApprove(line)}>
-              {t('admin.approve')}
-            </button>
-          </div>
-        </>
+      {status === 'verified' && (
+        <div className="grid grid-cols-2 gap-3">
+          <Link
+            to={`/sticker/${encodeURIComponent(d.tricycle_plate_number)}`}
+            className="btn-dark flex items-center justify-center"
+          >
+            🖨️ {t('sticker.open')}
+          </Link>
+          <button className="btn-ghost" disabled={busy} onClick={onRevoke}>{t('admin.revoke')}</button>
+        </div>
       )}
 
       {status === 'verified' && (

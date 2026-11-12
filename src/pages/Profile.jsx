@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import QrVisibility from '../components/Driver/QrVisibility';
 import { supabase } from '../services/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { useLang } from '../context/LanguageContext';
@@ -207,7 +207,16 @@ export default function Profile() {
               </form>
             </section>
 
-            <QrUpload qrUrl={driver.qr_code_url} disabled={dBusy} onUpload={handleQr} />
+                       <QrVisibility driver={driver} onChange={setDriver} />
+            {locked && (
+              <Link
+                to={`/sticker/${encodeURIComponent(driver.tricycle_plate_number)}`}
+                className="btn-dark flex items-center justify-center"
+              >
+                🖨️ {t('sticker.open')}
+              </Link>
+            )}
+            
           </>
         )}
 
