@@ -23,7 +23,7 @@ function Stepper({ label, hint, value, min, max, onChange }) {
   );
 }
 
-export default function RideRequestPanel({ mode, setMode, picked, setPicked, sheds, onCreated }) {
+export default function RideRequestPanel({ mode, setMode, picked, setPicked, sheds, onCreated, api }) {
   const { t } = useLang();
   const [locating, setLocating] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -49,7 +49,7 @@ export default function RideRequestPanel({ mode, setMode, picked, setPicked, she
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
-        const q = await estimateTrip(pickup[0], pickup[1], dest, passengers, discounted);
+        const q = await (api?.estimateTrip ?? estimateTrip)(pickup[0], pickup[1], dest, passengers, discounted);
         if (!cancelled) { setQuote(q); setError(''); }
       } catch (e) {
         if (!cancelled) { setQuote(null); setError(errText(e)); }
@@ -94,7 +94,7 @@ export default function RideRequestPanel({ mode, setMode, picked, setPicked, she
     setError('');
     try {
       if (!isInsideArea(picked[0], picked[1], sheds)) return setError(t('req.err.outside_area'));
-      const snap = await snapToRoad(picked[0], picked[1]);
+      const snap = await (api?.snapToRoad ?? snapToRoad)(picked[0], picked[1]);
       if (snap && snap.distance > MAX_ROAD_M) return setError(t('wait.tooFar'));
       const p = snap ? [snap.lat, snap.lng] : picked;
       setPickup(p);
@@ -109,7 +109,7 @@ export default function RideRequestPanel({ mode, setMode, picked, setPicked, she
     setSubmitting(true);
     setError('');
     try {
-      await createRequest(pickup[0], pickup[1], dest, passengers, discounted);
+      await (api?.createRequest ?? createRequest)(pickup[0], pickup[1], dest, passengers, discounted);
       reset();
       onCreated();
     } catch (e) {

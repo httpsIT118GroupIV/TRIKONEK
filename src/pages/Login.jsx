@@ -90,7 +90,9 @@ export default function Login() {
               </Link>
             </p>
           </form>
-
+            <Link to="/demo" className="btn-ghost mt-4 flex items-center justify-center">
+           ▶ {t('dm.try')}
+          </Link>
           {DEMO && (
             <div className="mt-8 rounded-2xl border border-dashed border-gray-300 p-4">
               <p className="text-sm font-bold">Demo mode</p>

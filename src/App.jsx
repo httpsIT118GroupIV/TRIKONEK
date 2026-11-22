@@ -12,6 +12,7 @@ import Profile from './pages/Profile';
 import Faq from './pages/Faq';
 import Verify from './pages/Verify';
 import Sticker from './pages/Sticker';
+import Demo from './pages/Demo';
 
 function RoleRedirect() {
   const { session, role, loading, signOut } = useAuth();
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="/faq" element={<ProtectedRoute allow={['commuter', 'driver', 'admin']}><Faq /></ProtectedRoute>} />
           <Route path="/t/:plate" element={<Verify />} />
           <Route path="/sticker/:plate" element={<ProtectedRoute allow={['driver', 'admin']}><Sticker /></ProtectedRoute>} />
+          <Route path="/demo" element={<Demo />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
