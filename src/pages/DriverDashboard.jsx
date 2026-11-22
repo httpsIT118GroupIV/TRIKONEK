@@ -17,6 +17,7 @@ import ProfileCard from '../components/Driver/ProfileCard';
 import DriverMap from '../components/Driver/DriverMap';
 import DriverRequests from '../components/Driver/DriverRequests';
 import TodayTrips from '../components/Driver/TodayTrips';
+import AcceptingSwitch from '../components/Driver/AcceptingSwitch';
 
 const USE_REAL_GPS = import.meta.env.VITE_USE_REAL_GPS === 'true';
 const MOVING_KMH = 10; // mas mabilis dito = naka-lock ang Accept at Available/Full
@@ -301,6 +302,7 @@ export default function DriverDashboard() {
           onAccept={accept}
           onRelease={(id) => finish(releaseRequest, id)}
           onComplete={(id) => finish(completeRequest, id)}
+          accepting={!!driver.accepting_requests}
         />
 
         <ShiftSwitch
@@ -309,6 +311,15 @@ export default function DriverDashboard() {
           onChange={(v) => {
             if (v) unlockAudio();
             run(() => updateDriver(userId, { is_online: v }));
+          }}
+        />
+
+          <AcceptingSwitch
+          accepting={!!driver.accepting_requests}
+          disabled={busy || !verified}
+          onChange={(v) => {
+            if (v) unlockAudio();
+            run(() => updateDriver(userId, { accepting_requests: v }));
           }}
         />
 

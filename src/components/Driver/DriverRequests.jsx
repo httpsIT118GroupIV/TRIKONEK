@@ -19,7 +19,9 @@ function mmss(ms) {
 }
 
 export default function DriverRequests({
-  active, requests, isOnline, isFull, moving, busy, onAccept, onRelease, onComplete,
+  active, requests, isOnline, isFull, moving, busy,
+  accepting = true,
+  onAccept, onRelease, onComplete,
 }) {
   const { t } = useLang();
   const now = useNow();
@@ -67,6 +69,8 @@ export default function DriverRequests({
 
       {!isOnline ? (
         <p className="rounded-xl bg-gray-50 px-3 py-3 text-sm text-gray-500">{t('drv.goOnlineMap')}</p>
+      ) : !accepting ? (
+        <p className="rounded-xl bg-amber-50 px-3 py-3 text-sm text-accent">{t('drv.notAccepting')}</p>
       ) : isFull ? (
         <p className="rounded-xl bg-amber-50 px-3 py-3 text-sm text-accent">{t('drv.fullNoRequests')}</p>
       ) : requests.length === 0 ? (
@@ -96,7 +100,7 @@ export default function DriverRequests({
         </ul>
       )}
 
-      {isOnline && !isFull && (
+      {isOnline && accepting && !isFull && (
         <p className="text-xs text-gray-500">
           {t('drv.fuzzyNote')}
           {requests[0]?.night && ` ${t('drv.nightNote')}`}
