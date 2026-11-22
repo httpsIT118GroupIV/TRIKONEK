@@ -8,13 +8,6 @@ import PasswordInput from '../components/common/PasswordInput';
 import { HOME } from '../utils/roleHome';
 import { authErrorKey } from '../utils/authErrors';
 
-const DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
-const DEMO_PASSWORD = 'Demo12345!';
-const DEMO_ACCOUNTS = {
-  commuter: 'demo.commuter@example.com',
-  driver: 'demo.driver@example.com',
-};
-
 export default function Login() {
   const { session, role, loading: authLoading } = useAuth();
   const { t } = useLang();
@@ -28,21 +21,17 @@ export default function Login() {
     return <Navigate to={role ? HOME[role] : '/'} replace />;
   }
 
-  async function signIn(em, pw) {
+  async function handleSubmit(e) {
+    e.preventDefault();
     setError('');
     setSubmitting(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: em.trim(), password: pw });
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (error) {
       setSubmitting(false);
       const k = authErrorKey(error.message);
       return setError(k ? t(k) : error.message);
     }
     // Hindi na mag-navigate dito: ang redirect sa itaas ang bahala
-  }
-
-  function handleSubmit(e) {
-    e.preventDefault();
-    signIn(email, password);
   }
 
   const busy = submitting || authLoading;
@@ -90,25 +79,10 @@ export default function Login() {
               </Link>
             </p>
           </form>
-            <Link to="/demo" className="btn-ghost mt-4 flex items-center justify-center">
-           ▶ {t('dm.try')}
+
+          <Link to="/demo" className="btn-ghost mt-4 flex items-center justify-center">
+            ▶ {t('dm.try')}
           </Link>
-          {DEMO && (
-            <div className="mt-8 rounded-2xl border border-dashed border-gray-300 p-4">
-              <p className="text-sm font-bold">Demo mode</p>
-              <p className="text-xs text-gray-500 mt-0.5 mb-3">Isang click lang, walang kailangang i-type.</p>
-              <div className="grid grid-cols-2 gap-3">
-                <button type="button" className="btn-ghost" disabled={busy}
-                  onClick={() => signIn(DEMO_ACCOUNTS.commuter, DEMO_PASSWORD)}>
-                  View as Commuter
-                </button>
-                <button type="button" className="btn-dark" disabled={busy}
-                  onClick={() => signIn(DEMO_ACCOUNTS.driver, DEMO_PASSWORD)}>
-                  View as Driver
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </main>
     </div>

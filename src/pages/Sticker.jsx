@@ -15,8 +15,8 @@ export default function Sticker() {
     getTricycleInfo(plate).then(setInfo).catch(() => setInfo({ status: 'error' }));
   }, [plate]);
 
-  const url = `${BASE_URL}/t/${encodeURIComponent(plate)}`;
-
+const slug = encodeURIComponent((info?.plate || plate).replace(/\s+/g, ''));
+const url = `${BASE_URL}/t/${slug}`;
   return (
     <div className="min-h-screen bg-brand-soft pb-10 print:bg-white">
       <header className="flex items-center justify-between bg-brand px-4 py-3 print:hidden">
@@ -48,6 +48,11 @@ export default function Sticker() {
               </div>
               <p className="mt-2 text-3xl font-extrabold tracking-wider">{info.plate}</p>
               {info.toda && <p className="text-sm font-semibold text-gray-600">{info.toda}</p>}
+              {/localhost|127\.0\.0\.1|192\.168\./.test(BASE_URL) && (
+              <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-accent print:hidden">
+               {t('sticker.localWarn')}
+               </p>
+                )}
               <p className="mt-2 text-xs text-gray-600">{t('sticker.scan')}</p>
               <p className="mt-1 break-all text-[10px] text-gray-400">{url}</p>
             </div>

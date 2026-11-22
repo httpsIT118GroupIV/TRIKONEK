@@ -331,6 +331,7 @@ const dict = {
     'dm.s7.t': 'The driver finishes the trip',
     'dm.s7.d': 'The driver taps Done and the request closes. Tap Done or press Next.',
     'dm.s8.t': 'Terminals, stickers, and more',
+    'sticker.localWarn': 'This QR points to your own computer, so other phones cannot open it. Open this page from the live site (trikonek.netlify.app) before printing.',
     'dm.s8.d': 'At terminals the queue works as always; the app only shows how many are waiting. Inside each tricycle, a sticker QR lets any passenger check the tricycle, see the fare, and show a PAID screen, with no account needed.',
   },
   tl: {
@@ -664,7 +665,8 @@ const dict = {
     'dm.s7.d': 'Pipindutin ng driver ang Tapos na at magsasara ang request. Pindutin ang Tapos na o ang Susunod.',
     'dm.s8.t': 'Mga terminal, sticker, at iba pa',
     'dm.s8.d': 'Sa terminal, gumagana pa rin ang pila gaya ng dati; ipinapakita lang ng app kung ilan ang naghihintay. Sa loob ng bawat tricycle, may sticker na QR na magagamit ng sinumang pasahero para i-check ang tricycle, makita ang pamasahe, at ipakita ang BAYAD NA, walang account.',
-  },
+    'sticker.localWarn': 'Sa sarili mong computer nakaturo ang QR na ito, kaya hindi ito mabubuksan ng ibang phone. Buksan ang page na ito mula sa live na site (trikonek.netlify.app) bago i-print.',
+    'sticker.localWarn': 'Sa sarili mong computer nakaturo ang QR na ito, kaya hindi ito mabubuksan ng ibang phone. Buksan ang page na ito mula sa live na site (trikonek.netlify.app) bago i-print.',  },
 };
 
 const LanguageContext = createContext(null);
