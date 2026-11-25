@@ -7,6 +7,7 @@ import useProfile from '../hooks/useProfile';
 import { getMyDriver, updateDriver, uploadQr } from '../services/driverService';
 import QrUpload from '../components/Driver/QrUpload';
 import LanguageToggle from '../components/common/LanguageToggle';
+import { Link, useNavigate } from 'react-router-dom';
 
 const BADGE = {
   verified: 'bg-emerald-50 text-available',
@@ -14,7 +15,7 @@ const BADGE = {
   rejected: 'bg-rose-50 text-full',
 };
 
-export default function Profile() {
+export default function Profile({ embedded = false }) {
   const nav = useNavigate();
   const { session, role, signOut } = useAuth();
   const { t } = useLang();
@@ -110,7 +111,7 @@ export default function Profile() {
   const status = driver?.verification_status || 'pending';
 
   return (
-    <div className="min-h-screen bg-brand-soft pb-10">
+    <div className={embedded ? '' : 'min-h-screen bg-brand-soft pb-10'}>
       <header className="flex items-center justify-between bg-brand px-4 py-3">
         <button
           onClick={() => nav('/')}
@@ -123,7 +124,7 @@ export default function Profile() {
         <LanguageToggle />
       </header>
 
-      <main className="mx-auto max-w-md space-y-4 px-4 pt-4">
+      <main className="mx-auto max-w-md space-y-4 px-4 py-4">
         {/* Account */}
         <section className="card">
           <div className="flex items-center gap-3">
@@ -207,8 +208,8 @@ export default function Profile() {
               </form>
             </section>
 
-                       <QrVisibility driver={driver} onChange={setDriver} />
-            {locked && (
+              <QrUpload qrUrl={driver.qr_code_url} onUpload={handleQr} />
+              <QrVisibility driver={driver} onChange={setDriver} />            {locked && (
               <Link
                 to={`/sticker/${encodeURIComponent(driver.tricycle_plate_number)}`}
                 className="btn-dark flex items-center justify-center"
@@ -220,7 +221,7 @@ export default function Profile() {
           </>
         )}
 
-        <button onClick={signOut} className="btn-ghost">{t('common.signOut')}</button>
+        {!embedded && <button onClick={signOut} className="btn-ghost">{t('common.signOut')}</button>}
       </main>
     </div>
   );

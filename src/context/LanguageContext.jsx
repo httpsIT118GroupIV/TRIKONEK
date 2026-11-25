@@ -361,6 +361,14 @@ const dict = {
     'drv.acceptingOffHint': 'No requests. Your place in the terminal queue is not affected.',
     'drv.notAccepting': 'Turn on "I am taking rides" to receive requests.',
     'dm.s8.d': 'At terminals the queue works as always; the app only shows how many are waiting. Inside each tricycle, a sticker QR lets any passenger check the tricycle, see the fare, and show a PAID screen, with no account needed.',
+    'tab.home': 'Home',
+    'tab.requests': 'Requests',
+    'tab.profile': 'Profile',
+    'drv.newRequest': 'New pickup request',
+    'drv.decline': 'Decline',
+    'drv.route': 'Your route',
+    'drv.tapChange': 'Tap to change',
+    'drv.tripsShort': '{n} scanned today',
   },
   tl: {
     'app.name': 'TrikoNek',
@@ -722,7 +730,15 @@ const dict = {
     'drv.acceptingOnHint': 'Makakatanggap ka ng request na malapit sa iyo.',
     'drv.acceptingOffHint': 'Walang request. Hindi apektado ang pila mo sa terminal.',
     'drv.notAccepting': 'I-on ang "Tumatanggap ako ng biyahe" para makatanggap ng request.',
-    'sticker.localWarn': 'Sa sarili mong computer nakaturo ang QR na ito, kaya hindi ito mabubuksan ng ibang phone. Buksan ang page na ito mula sa live na site (trikonek.netlify.app) bago i-print.',  },
+        'tab.home': 'Home',
+    'tab.requests': 'Mga request',
+    'tab.profile': 'Profile',
+    'drv.newRequest': 'Bagong request ng sundo',
+    'drv.decline': 'Tanggihan',
+    'drv.route': 'Ruta mo',
+        'drv.tapChange': 'I-tap para palitan',
+    'drv.tripsShort': '{n} na-scan ngayon',
+},
 };
 
 const LanguageContext = createContext(null);

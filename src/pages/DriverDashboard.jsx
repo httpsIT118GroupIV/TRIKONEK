@@ -10,29 +10,30 @@ import {
 import { formatDistance } from '../utils/geo';
 import { alertDriver, unlockAudio } from '../utils/alerts';
 import useWakeLock from '../hooks/useWakeLock';
-import StatusToggle from '../components/Driver/StatusToggle';
-import ShiftSwitch from '../components/Driver/ShiftSwitch';
 import DriverHeader from '../components/Driver/DriverHeader';
-import ProfileCard from '../components/Driver/ProfileCard';
+import DriverTabs from '../components/Driver/DriverTabs';
+import HomeSheet from '../components/Driver/HomeSheet';
 import DriverMap from '../components/Driver/DriverMap';
 import DriverRequests from '../components/Driver/DriverRequests';
-import TodayTrips from '../components/Driver/TodayTrips';
-import AcceptingSwitch from '../components/Driver/AcceptingSwitch';
+import RequestPopup from '../components/Driver/RequestPopup';
+import Profile from './Profile';
 
 const USE_REAL_GPS = import.meta.env.VITE_USE_REAL_GPS === 'true';
-const MOVING_KMH = 10; // mas mabilis dito = naka-lock ang Accept at Available/Full
+const MOVING_KMH = 10;
 
 export default function DriverDashboard() {
   const { session, signOut } = useAuth();
   const { t } = useLang();
   const userId = session.user.id;
 
+  const [tab, setTab] = useState('home');
   const [driver, setDriver] = useState(null);
   const [sheds, setSheds] = useState([]);
   const [signals, setSignals] = useState([]);
   const [requests, setRequests] = useState([]);
   const [active, setActive] = useState(null);
-  const [gps, setGps] = useState(null); // { pos: [lat, lng], speed: m/s | null }
+  const [dismissed, setDismissed] = useState(() => new Set());
+  const [gps, setGps] = useState(null);
   const [spot, setSpot] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -52,7 +53,6 @@ export default function DriverDashboard() {
 
   useWakeLock(isOnline);
 
-  // Totoong GPS: gagana lang kapag VITE_USE_REAL_GPS=true
   useEffect(() => {
     if (!USE_REAL_GPS || !isOnline || !navigator.geolocation) return;
     let last = 0;
@@ -73,7 +73,6 @@ export default function DriverDashboard() {
     return () => navigator.geolocation.clearWatch(watchId);
   }, [isOnline, userId]);
 
-  // Mga request: bawat 3 segundo. Ang aktibong sundo ay tinitingnan kahit Offline.
   useEffect(() => {
     if (!verified) {
       setRequests([]);
@@ -95,7 +94,6 @@ export default function DriverDashboard() {
     return () => { stop = true; clearInterval(timer); };
   }, [isOnline, verified]);
 
-  // Mga naghihintay sa terminal (pasibo): bilang lang
   useEffect(() => {
     if (!isOnline) {
       setSignals([]);
@@ -114,7 +112,6 @@ export default function DriverDashboard() {
     };
   }, [isOnline]);
 
-  // Beep at vibration kapag may bagong request, isang beses bawat request
   useEffect(() => {
     for (const r of requests) {
       if (!seen.current.has(r.id)) {
@@ -194,6 +191,8 @@ export default function DriverDashboard() {
     }
   }
 
+  const decline = (id) => setDismissed((prev) => new Set(prev).add(id));
+
   function handlePickSpot(e) {
     unlockAudio();
     const id = e.target.value;
@@ -233,7 +232,18 @@ export default function DriverDashboard() {
     );
   }
 
-  // Ang makikita sa ibabaw ng mapa
+  const canReceive = isOnline && verified && !!driver.accepting_requests && driver.status !== 'full' && !active;
+  const popupReq = canReceive && tab !== 'requests' ? requests.find((r) => !dismissed.has(r.id)) : null;
+
+  const reqProps = {
+    active, requests, isOnline, moving, busy,
+    isFull: driver.status === 'full',
+    accepting: !!driver.accepting_requests,
+    onAccept: accept,
+    onRelease: (id) => finish(releaseRequest, id),
+    onComplete: (id) => finish(completeRequest, id),
+  };
+
   let banner;
   if (active) {
     banner = (
@@ -250,9 +260,7 @@ export default function DriverDashboard() {
         <p className="text-lg font-extrabold leading-tight">
           🧍 {t('drv.reqNearby')} · {formatDistance(requests[0].distance_m)}
         </p>
-        <p className="text-xs font-semibold text-white/90">
-          {t('drv.reqCount').replace('{n}', requests.length)}
-        </p>
+        <p className="text-xs font-semibold text-white/90">{t('drv.reqCount').replace('{n}', requests.length)}</p>
       </div>
     );
   } else {
@@ -264,103 +272,68 @@ export default function DriverDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-soft pb-10">
-      <DriverHeader plate={driver.tricycle_plate_number} />
+    <div className="flex h-dvh flex-col bg-brand-soft">
+      <DriverHeader plate={driver.tricycle_plate_number} onSignOut={signOut} />
 
-      <main className="mx-auto -mt-1 max-w-md space-y-4 px-4">
-        {error && (
-          <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-full">{error}</p>
-        )}
+      {tab === 'home' && (
+        <div className="relative min-h-0 flex-1">
+          <DriverMap
+            fill
+            sheds={sheds}
+            waiting={waiting}
+            pickup={active ? [Number(active.pickup_lat), Number(active.pickup_lng)] : null}
+            me={me}
+            banner={banner}
+            recenterLabel={t('drv.center')}
+            meLabel={t('drv.me')}
+          />
+          <div className="absolute inset-x-0 bottom-0 z-10 mx-auto max-w-md">
+            <HomeSheet
+              driver={driver}
+              verified={verified}
+              busy={busy}
+              moving={moving}
+              error={error}
+              active={active}
+              requestProps={reqProps}
+              onOnline={(v) => { if (v) unlockAudio(); run(() => updateDriver(userId, { is_online: v })); }}
+              onAccepting={(v) => { if (v) unlockAudio(); run(() => updateDriver(userId, { accepting_requests: v })); }}
+              onStatus={(s) => run(() => updateDriver(userId, { status: s }))}
+              showDemo={!USE_REAL_GPS}
+              sheds={sheds}
+              spot={spot}
+              onPickSpot={handlePickSpot}
+            />
+          </div>
+        </div>
+      )}
 
-        {!verified && (
-          <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-accent">
-            {t('verify.notVerified')}
-          </p>
-        )}
+      {tab === 'requests' && (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <main className="mx-auto max-w-md space-y-4 px-4 py-4">
+            {error && <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-full">{error}</p>}
+            <DriverRequests {...reqProps} />
+          </main>
+        </div>
+      )}
 
-        <ProfileCard driver={driver} />
-        <TodayTrips />
+      {tab === 'profile' && (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <Profile embedded />
+        </div>
+      )}
 
-        <DriverMap
-          sheds={sheds}
-          waiting={waiting}
-          requests={requests}
-          pickup={active ? [Number(active.pickup_lat), Number(active.pickup_lng)] : null}
-          me={me}
-          banner={banner}
-          recenterLabel={t('drv.center')}
-          meLabel={t('drv.me')}
-        />
+      <DriverTabs tab={tab} onChange={setTab} badge={active ? 0 : requests.length} />
 
-        <DriverRequests
-          active={active}
-          requests={requests}
-          isOnline={isOnline}
-          isFull={driver.status === 'full'}
-          moving={moving}
+      {popupReq && (
+        <RequestPopup
+          request={popupReq}
           busy={busy}
+          moving={moving}
           onAccept={accept}
-          onRelease={(id) => finish(releaseRequest, id)}
-          onComplete={(id) => finish(completeRequest, id)}
-          accepting={!!driver.accepting_requests}
+          onDecline={decline}
         />
-
-        <ShiftSwitch
-          isOnline={driver.is_online}
-          disabled={busy || !verified}
-          onChange={(v) => {
-            if (v) unlockAudio();
-            run(() => updateDriver(userId, { is_online: v }));
-          }}
-        />
-
-          <AcceptingSwitch
-          accepting={!!driver.accepting_requests}
-          disabled={busy || !verified}
-          onChange={(v) => {
-            if (v) unlockAudio();
-            run(() => updateDriver(userId, { accepting_requests: v }));
-          }}
-        />
-
-        {moving && (
-          <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-accent">
-            🛑 {t('drv.stopFirst')}
-          </p>
-        )}
-
-        <StatusToggle
-          status={driver.status}
-          disabled={busy || moving}
-          onChange={(s) => run(() => updateDriver(userId, { status: s }))}
-        />
-
-        {!USE_REAL_GPS && (
-          <section className="card">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">📍</span>
-              <h3 className="text-base font-extrabold">{t('demo.title')}</h3>
-            </div>
-            <p className="mt-1 text-sm text-gray-500">{t('demo.desc')}</p>
-            <select value={spot} onChange={handlePickSpot} disabled={busy} className="input mt-3 appearance-none">
-              <option value="">{t('demo.pick')}</option>
-              {sheds.map((s) => (
-                <option key={s.id} value={s.id}>{s.shed_name}</option>
-              ))}
-            </select>
-            <p className="mt-3 text-xs text-gray-500">
-              {t('demo.current')}:{' '}
-              <span className="font-semibold text-ink">
-                {driver.current_latitude
-                  ? `${Number(driver.current_latitude).toFixed(4)}, ${Number(driver.current_longitude).toFixed(4)}`
-                  : t('demo.none')}
-              </span>
-            </p>
-          </section>
-        )}
-
-        <button onClick={signOut} className="btn-ghost">{t('common.signOut')}</button>
-      </main>
+      )}
     </div>
   );
 }

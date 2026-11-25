@@ -25,6 +25,7 @@ const shedIcon = (n) => {
   return shedCache[n];
 };
 const ROADSIDE = circle('🧍', '#F59E0B', 38);
+const PICKUP = circle('📍', '#F59E0B', 38);
 const ME = circle('🛺', '#16A34A', 42);
 
 function BoundsLock({ sheds }) {
@@ -40,7 +41,6 @@ function BoundsLock({ sheds }) {
   return null;
 }
 
-// Lilipat sa lokasyon ng driver isang beses lang, pagkakuha ng unang posisyon
 function FollowMe({ me }) {
   const map = useMap();
   const done = useRef(false);
@@ -53,28 +53,40 @@ function FollowMe({ me }) {
   return null;
 }
 
-function RecenterButton({ me, label }) {
+function RecenterButton({ me, label, fill }) {
   const map = useMap();
   if (!me) return null;
   return (
     <button
       type="button"
+      aria-label={label}
+      title={label}
       onClick={() => map.flyTo(me, Math.max(map.getZoom(), 16), { duration: 0.6 })}
-      className="absolute bottom-3 left-3 z-[1000] h-10 rounded-full bg-white px-4 text-sm font-bold shadow-lg transition active:scale-95"
+      className={
+        fill
+          ? 'absolute right-[10px] top-[84px] z-[1000] flex h-[34px] w-[34px] items-center justify-center rounded-md border-2 border-black/20 bg-white text-lg active:scale-95'
+          : 'absolute bottom-3 left-3 z-[1000] h-10 rounded-full bg-white px-4 text-sm font-bold shadow-lg transition active:scale-95'
+      }
     >
-      🎯 {label}
+      {fill ? '🎯' : `🎯 ${label}`}
     </button>
   );
 }
 
-export default function DriverMap({ sheds, waiting, me, banner, recenterLabel, meLabel }) {
+export default function DriverMap({ sheds, waiting, pickup, me, banner, recenterLabel, meLabel, fill = false }) {
   const countByShed = {};
   waiting
     .filter((w) => w.kind === 'terminal')
     .forEach((w) => { countByShed[w.shedId] = (countByShed[w.shedId] || 0) + 1; });
 
   return (
-    <div className="relative isolate h-[46vh] min-h-[280px] overflow-hidden rounded-2xl shadow-sm">
+    <div
+      className={
+        fill
+          ? 'absolute inset-0 isolate'
+          : 'relative isolate h-[46vh] min-h-[280px] overflow-hidden rounded-2xl shadow-sm'
+      }
+    >
       <MapContainer
         center={CENTER}
         zoom={13}
@@ -87,7 +99,7 @@ export default function DriverMap({ sheds, waiting, me, banner, recenterLabel, m
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <ZoomControl position="bottomright" />
+        <ZoomControl position={fill ? 'topright' : 'bottomright'} />
         <BoundsLock sheds={sheds} />
         <FollowMe me={me} />
 
@@ -107,16 +119,26 @@ export default function DriverMap({ sheds, waiting, me, banner, recenterLabel, m
             <Marker key={w.id} position={[w.lat, w.lng]} icon={ROADSIDE} />
           ))}
 
+        {pickup && <Marker position={pickup} icon={PICKUP} zIndexOffset={900} />}
+
         {me && (
           <Marker position={me} icon={ME} zIndexOffset={1000}>
             <Tooltip direction="top" offset={[0, -20]}>{meLabel}</Tooltip>
           </Marker>
         )}
 
-        <RecenterButton me={me} label={recenterLabel} />
+        <RecenterButton me={me} label={recenterLabel} fill={fill} />
       </MapContainer>
 
-      <div className="pointer-events-none absolute inset-x-3 top-3 z-[1000]">{banner}</div>
+      <div
+        className={
+          fill
+            ? 'pointer-events-none absolute left-3 right-14 top-3 z-[1000]'
+            : 'pointer-events-none absolute inset-x-3 top-3 z-[1000]'
+        }
+      >
+        {banner}
+      </div>
     </div>
   );
 }
