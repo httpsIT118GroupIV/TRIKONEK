@@ -11,7 +11,7 @@ export async function getSheds() {
 export async function getOnlineDrivers() {
   const { data, error } = await supabase
     .from('drivers')
-    .select('id, tricycle_plate_number, status, verification_status, line, current_latitude, current_longitude, qr_code_url')
+    .select('id, tricycle_plate_number, status, verification_status, line, current_latitude, current_longitude, qr_code_url, heading_deg, heading_at')
     .eq('is_online', true)
     .eq('verification_status', 'verified')
     .not('current_latitude', 'is', null)

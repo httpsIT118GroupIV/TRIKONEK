@@ -369,6 +369,11 @@ const dict = {
     'drv.route': 'Your route',
     'drv.tapChange': 'Tap to change',
     'drv.tripsShort': '{n} scanned today',
+        'act.coming': 'Coming your way',
+    'act.eta': 'about {m} min',
+    'act.atTerminal': 'At the terminal',
+    'act.sumComing': '{n} tricycle(s) coming your way.',
+    'act.noneComing': "No tricycle is coming your way right now. Ones that already passed you are hidden. Tap a terminal and press \"Someone is waiting here\", or check again soon.",
   },
   tl: {
     'app.name': 'TrikoNek',
@@ -738,6 +743,11 @@ const dict = {
     'drv.route': 'Ruta mo',
         'drv.tapChange': 'I-tap para palitan',
     'drv.tripsShort': '{n} na-scan ngayon',
+        'act.coming': 'Paparating',
+    'act.eta': 'mga {m} min',
+    'act.atTerminal': 'Nasa terminal',
+    'act.sumComing': '{n} tricycle ang paparating sa iyo.',
+    'act.noneComing': 'Walang tricycle na paparating ngayon. Nakatago ang mga nakalampas na. I-tap ang terminal at pindutin ang "May naghihintay dito", o tingnan ulit mamaya.',
 },
 };
 

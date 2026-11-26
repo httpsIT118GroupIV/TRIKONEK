@@ -5,16 +5,11 @@ import { useLang } from '../context/LanguageContext';
 import {
   getSheds, getOnlineDrivers, getMyWaitingSignals, sendSignal, cancelSignal,
 } from '../services/mapService';
-import { getMyRequest, cancelRequest, rideErrorKey } from '../services/rideService';
 import useTricycleFilter from '../hooks/useTricycleFilter';
 import MapView from '../components/Map/MapView';
-import RoadsideLayer from '../components/Map/RoadsideLayer';
 import FlyToLayer from '../components/Map/FlyToLayer';
 import PaymentSelector from '../components/Commuter/PaymentSelector';
-import RideRequestPanel from '../components/Commuter/RideRequestPanel';
-import ActiveRequestCard from '../components/Commuter/ActiveRequestCard';
 import ActiveTricycles from '../components/Commuter/ActiveTricycles';
-import BottomTabs from '../components/Commuter/BottomTabs';
 import LanguageToggle from '../components/common/LanguageToggle';
 import SideMenu from '../components/common/SideMenu';
 
@@ -26,14 +21,10 @@ export default function CommuterHome() {
   const [sheds, setSheds] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [signals, setSignals] = useState([]);
-  const [req, setReq] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [payId, setPayId] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [tab, setTab] = useState('tricycles'); // tricycles | book
-  const [mode, setMode] = useState('idle');    // idle | pickup | form (para sa Mag-book)
-  const [picked, setPicked] = useState(null);
   const [focus, setFocus] = useState(null);
 
   const f = useTricycleFilter(drivers, sheds);
@@ -44,31 +35,28 @@ export default function CommuterHome() {
   const refreshSignals = useCallback(() => {
     getMyWaitingSignals(userId).then(setSignals).catch((e) => setError(e.message));
   }, [userId]);
-  const refreshRequest = useCallback(() => {
-    getMyRequest().then(setReq).catch(() => {});
-  }, []);
 
   useEffect(() => {
     getSheds().then(setSheds).catch((e) => setError(e.message));
     refreshDrivers();
     refreshSignals();
-    refreshRequest();
 
     const channel = supabase
       .channel('drivers-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, refreshDrivers)
       .subscribe();
-    const timer = setInterval(() => { refreshDrivers(); refreshRequest(); }, 3000);
+    const timer = setInterval(refreshDrivers, 3000);
 
     return () => {
       supabase.removeChannel(channel);
       clearInterval(timer);
     };
-  }, [refreshDrivers, refreshSignals, refreshRequest]);
+  }, [refreshDrivers, refreshSignals]);
 
   const shedSignals = signals.filter((s) => s.shed_id);
   const waitingByShed = Object.fromEntries(shedSignals.map((s) => [s.shed_id, s.id]));
   const payDriver = drivers.find((d) => d.id === payId);
+  const mapDrivers = f.mode === 'route' && f.ready ? f.rows.map((r) => r.driver) : drivers;
 
   async function handleSignal(shedId) {
     setBusy(true);
@@ -86,76 +74,12 @@ export default function CommuterHome() {
     finally { setBusy(false); }
   }
 
-  async function handleCancelRequest() {
-    if (!req) return;
-    setBusy(true);
-    setError('');
-    try { await cancelRequest(req.id); setReq(null); refreshRequest(); }
-    catch (e) { const k = rideErrorKey(e.message); setError(k ? t(k) : e.message); }
-    finally { setBusy(false); }
-  }
-
-  const browsing = !req && mode === 'idle';
-  const showTabs = browsing;
-  const filtered = tab === 'tricycles' && browsing;
-  const mapDrivers = filtered ? f.rows.map((r) => r.driver) : drivers;
-
-  const pins = req
-    ? [{ id: req.id, latitude: req.pickup_lat, longitude: req.pickup_lng }]
-    : mode === 'form' && picked
-      ? [{ id: 'draft', latitude: picked[0], longitude: picked[1] }]
-      : [];
-
-  const TABS = [
-    { id: 'tricycles', icon: '🛺', label: t('tab.tricycles') },
-    { id: 'book', icon: '📍', label: t('tab.book') },
-  ];
-
   const legend = [
     { color: 'bg-available', label: t('map.legend.available') },
     { color: 'bg-full', label: t('map.legend.full') },
     { color: 'bg-blue-600', label: t('map.legend.terminal') },
     { color: 'bg-amber-500', label: t('map.legend.signaled') },
   ];
-
-  let bottom;
-  if (req) {
-    bottom = <ActiveRequestCard req={req} busy={busy} onCancel={handleCancelRequest} onPay={setPayId} />;
-  } else if (mode !== 'idle' || tab === 'book') {
-    bottom = (
-      <>
-        {tab === 'book' && mode === 'idle' && (
-          <div className="card space-y-2 shadow-lg">
-            <p className="font-bold">{t('book.title')}</p>
-            <p className="text-sm text-gray-600">{t('book.intro')}</p>
-            <p className="text-sm font-semibold text-available">
-              🛺 {t('book.online').replace('{n}', drivers.length)}{' '}
-              <button type="button" className="font-bold text-ink underline" onClick={() => setTab('tricycles')}>
-                {t('book.look')}
-              </button>
-            </p>
-          </div>
-        )}
-        <RideRequestPanel
-          mode={mode}
-          setMode={setMode}
-          picked={picked}
-          setPicked={setPicked}
-          sheds={sheds}
-          onCreated={refreshRequest}
-        />
-      </>
-    );
-  } else {
-    bottom = (
-      <ActiveTricycles
-        f={f}
-        sheds={sheds}
-        onLocate={(pos) => setFocus({ pos, ts: Date.now() })}
-        onPay={setPayId}
-      />
-    );
-  }
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-brand-soft">
@@ -168,22 +92,10 @@ export default function CommuterHome() {
           onSignal={handleSignal}
           onCancel={handleCancelSignal}
           onPay={setPayId}
-          extra={
-            <>
-              <RoadsideLayer
-                signals={pins}
-                picked={picked}
-                picking={mode === 'pickup' && !req}
-                onPick={setPicked}
-                label={t('wait.me')}
-              />
-              <FlyToLayer focus={focus} />
-            </>
-          }
+          extra={<FlyToLayer focus={focus} />}
         />
       </div>
 
-      {/* Header */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[1100] p-3">
         <div className="pointer-events-auto mx-auto max-w-md space-y-2">
           <div className="rounded-2xl bg-brand p-3 shadow-lg">
@@ -224,11 +136,14 @@ export default function CommuterHome() {
         </div>
       </div>
 
-      {/* Ibaba: panel at mga tab */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1100] p-3">
         <div className="pointer-events-auto mx-auto max-w-md space-y-2">
-          {bottom}
-          {showTabs && <BottomTabs tabs={TABS} active={tab} onChange={setTab} />}
+          <ActiveTricycles
+            f={f}
+            sheds={sheds}
+            onLocate={(pos) => setFocus({ pos, ts: Date.now() })}
+            onPay={setPayId}
+          />
         </div>
       </div>
 

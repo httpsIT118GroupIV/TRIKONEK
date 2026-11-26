@@ -7,7 +7,6 @@ import { getSheds, getActiveSignals } from '../services/mapService';
 import {
   driverOpenRequests, driverActiveRequest, acceptRequest, releaseRequest, completeRequest, rideErrorKey,
 } from '../services/rideService';
-import { formatDistance } from '../utils/geo';
 import { alertDriver, unlockAudio } from '../utils/alerts';
 import useWakeLock from '../hooks/useWakeLock';
 import DriverHeader from '../components/Driver/DriverHeader';
@@ -17,6 +16,7 @@ import DriverMap from '../components/Driver/DriverMap';
 import DriverRequests from '../components/Driver/DriverRequests';
 import RequestPopup from '../components/Driver/RequestPopup';
 import Profile from './Profile';
+import { distanceM, formatDistance, bearingDeg } from '../utils/geo';
 
 const USE_REAL_GPS = import.meta.env.VITE_USE_REAL_GPS === 'true';
 const MOVING_KMH = 10;
@@ -53,26 +53,37 @@ export default function DriverDashboard() {
 
   useWakeLock(isOnline);
 
-  useEffect(() => {
+   useEffect(() => {
     if (!USE_REAL_GPS || !isOnline || !navigator.geolocation) return;
     let last = 0;
+    let prev = null;
+    let latest = null; // { h, at }
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        setGps({ pos: [pos.coords.latitude, pos.coords.longitude], speed: pos.coords.speed });
+        const here = [pos.coords.latitude, pos.coords.longitude];
+        setGps({ pos: here, speed: pos.coords.speed });
+
+        let heading = null;
+        const c = pos.coords;
+        if (c.heading != null && !Number.isNaN(c.heading) && (c.speed ?? 0) > 1) heading = c.heading;
+        else if (prev && distanceM(prev, here) >= 15) heading = bearingDeg(prev, here);
+        if (!prev || distanceM(prev, here) >= 15) prev = here;
+        if (heading != null) latest = { h: heading, at: Date.now() };
+
         const now = Date.now();
         if (now - last < 5000) return;
         last = now;
-        updateDriver(userId, {
-          current_latitude: pos.coords.latitude,
-          current_longitude: pos.coords.longitude,
-        }).catch(() => {});
+        updateDriver(userId, { current_latitude: here[0], current_longitude: here[1] }).catch(() => {});
+        // Hiwalay na tawag para hindi maapektuhan ang lokasyon kung may problema sa heading
+        if (latest && now - latest.at < 15000) {
+          updateDriver(userId, { heading_deg: Math.round(latest.h), heading_at: new Date().toISOString() }).catch(() => {});
+        }
       },
       () => {},
       { enableHighAccuracy: true }
     );
     return () => navigator.geolocation.clearWatch(watchId);
   }, [isOnline, userId]);
-
   useEffect(() => {
     if (!verified) {
       setRequests([]);

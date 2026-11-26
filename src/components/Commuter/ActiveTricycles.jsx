@@ -1,6 +1,8 @@
 import { useLang } from '../../context/LanguageContext';
 import { formatDistance } from '../../utils/geo';
 
+const MPM = 420; // ~25 km/h
+
 export default function ActiveTricycles({ f, sheds, onLocate, onPay }) {
   const { t } = useLang();
   const sorted = [...sheds].sort((a, b) => a.shed_name.localeCompare(b.shed_name));
@@ -20,21 +22,19 @@ export default function ActiveTricycles({ f, sheds, onLocate, onPay }) {
     </button>
   );
 
-  let summary = null;
+  let summary;
   if (f.mode === 'route' && !f.ready) {
     summary = <p className="rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-600">{t('act.pickRoute')}</p>;
   } else if (n === 0) {
     summary = (
       <p className="rounded-xl bg-amber-50 px-3 py-3 text-sm text-accent">
-        {f.mode === 'route' ? t('act.none') : t('act.noneAll')}
+        {f.mode === 'route' ? t('act.noneComing') : t('act.noneAll')}
       </p>
     );
   } else {
-    const near = f.rows[0].dist != null ? ` ${t('act.nearest').replace('{d}', formatDistance(f.rows[0].dist))}` : '';
     summary = (
       <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-available">
-        {t(f.mode === 'route' ? 'act.sumRoute' : 'act.sumAll').replace('{n}', n)}
-        {near}
+        {t(f.mode === 'route' ? 'act.sumComing' : 'act.sumAll').replace('{n}', n)}
       </p>
     );
   }
@@ -94,10 +94,18 @@ export default function ActiveTricycles({ f, sheds, onLocate, onPay }) {
                         {t('act.toLibon')}
                       </span>
                     )}
-                    {r.dist != null && (
-                      <span className="text-xs text-gray-500">{formatDistance(r.dist)}</span>
-                    )}
                   </div>
+                  {r.state === 'coming' && (
+                    <p className="mt-1 text-xs font-semibold text-gray-600">
+                      {t('act.coming')} · {formatDistance(r.dist)} · {t('act.eta').replace('{m}', Math.max(1, Math.round(r.dist / MPM)))}
+                    </p>
+                  )}
+                  {r.state === 'idle' && (
+                    <p className="mt-1 text-xs font-semibold text-gray-600">{t('act.atTerminal')}</p>
+                  )}
+                  {!r.state && r.dist != null && (
+                    <p className="mt-1 text-xs text-gray-500">{formatDistance(r.dist)}</p>
+                  )}
                 </div>
                 <div className="flex shrink-0 gap-2">
                   <button onClick={() => onLocate(r.pos)}
