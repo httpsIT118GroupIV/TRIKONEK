@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, Marker, Tooltip, ZoomControl, useMap } from 'react-leaflet';
+import RouteLayer from './RouteLayer';
 
 const CENTER = [13.29, 123.42];
 const FALLBACK = L.latLngBounds([13.26, 123.35], [13.31, 123.5]);
@@ -41,15 +42,15 @@ function BoundsLock({ sheds }) {
   return null;
 }
 
-function FollowMe({ me }) {
+function FollowMe({ me, enabled }) {
   const map = useMap();
   const done = useRef(false);
   useEffect(() => {
-    if (me && !done.current) {
+    if (enabled && me && !done.current) {
       done.current = true;
       map.setView(me, Math.max(map.getZoom(), 15));
     }
-  }, [me, map]);
+  }, [me, map, enabled]);
   return null;
 }
 
@@ -73,7 +74,10 @@ function RecenterButton({ me, label, fill }) {
   );
 }
 
-export default function DriverMap({ sheds, waiting, pickup, me, banner, recenterLabel, meLabel, fill = false }) {
+export default function DriverMap({
+  sheds, waiting, pickup, me, banner, recenterLabel, meLabel,
+  fill = false, route = null, onRouteInfo,
+}) {
   const countByShed = {};
   waiting
     .filter((w) => w.kind === 'terminal')
@@ -101,7 +105,7 @@ export default function DriverMap({ sheds, waiting, pickup, me, banner, recenter
         />
         <ZoomControl position={fill ? 'topright' : 'bottomright'} />
         <BoundsLock sheds={sheds} />
-        <FollowMe me={me} />
+        <FollowMe me={me} enabled={!route} />
 
         {sheds.map((s) => (
           <Marker
@@ -119,13 +123,15 @@ export default function DriverMap({ sheds, waiting, pickup, me, banner, recenter
             <Marker key={w.id} position={[w.lat, w.lng]} icon={ROADSIDE} />
           ))}
 
-        {pickup && <Marker position={pickup} icon={PICKUP} zIndexOffset={900} />}
+        {pickup && !route && <Marker position={pickup} icon={PICKUP} zIndexOffset={900} />}
 
         {me && (
           <Marker position={me} icon={ME} zIndexOffset={1000}>
             <Tooltip direction="top" offset={[0, -20]}>{meLabel}</Tooltip>
           </Marker>
         )}
+
+        {route && <RouteLayer {...route} onInfo={onRouteInfo} />}
 
         <RecenterButton me={me} label={recenterLabel} fill={fill} />
       </MapContainer>

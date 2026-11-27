@@ -221,8 +221,10 @@ export default function Profile({ embedded = false }) {
           </>
         )}
 
-        {!embedded && <button onClick={signOut} className="btn-ghost">{t('common.signOut')}</button>}
-      </main>
+        <Link to="/faq" className="btn-ghost flex items-center justify-center">❓ {t('menu.faq')}</Link>
+        <button onClick={signOut} className="btn-dark">{t('common.signOut')}</button>
+        
+        </main>
     </div>
   );
 }

@@ -6,10 +6,8 @@ import TricycleMarker from './TricycleMarker';
 import ShedMarker from './ShedMarker';
 
 const CENTER = [13.29, 123.42];
-// Pansamantalang saklaw habang hindi pa nakukuha ang mga terminal
 const FALLBACK = L.latLngBounds([13.26, 123.35], [13.31, 123.5]);
 
-// Binabagay ang mapa sa saklaw ng mga terminal at nilalagyan ng "pader"
 function BoundsLock({ sheds }) {
   const map = useMap();
   useEffect(() => {
@@ -23,8 +21,10 @@ function BoundsLock({ sheds }) {
   return null;
 }
 
-   export default function MapView({ sheds, drivers, waitingByShed, busy, onSignal, onCancel, onPay, extra }) {
-return (
+export default function MapView({
+  sheds, drivers, waitingByShed, busy, onSignal, onCancel, onSelect, extra, highlightIds,
+}) {
+  return (
     <MapContainer
       center={CENTER}
       zoom={13}
@@ -37,7 +37,7 @@ return (
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <ZoomControl position="bottomright" />
+      <ZoomControl position="topright" />
       <BoundsLock sheds={sheds} />
       {sheds.map((s) => (
         <ShedMarker
@@ -50,7 +50,12 @@ return (
         />
       ))}
       {drivers.map((d) => (
-        <TricycleMarker key={d.id} driver={d} onPay={onPay} />
+        <TricycleMarker
+          key={d.id}
+          driver={d}
+          onSelect={onSelect}
+          dim={highlightIds ? !highlightIds.has(d.id) : false}
+        />
       ))}
       {extra}
     </MapContainer>

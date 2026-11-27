@@ -1,22 +1,25 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { useLang } from '../context/LanguageContext';
 import { getMyDriver, updateDriver } from '../services/driverService';
 import { getSheds, getActiveSignals } from '../services/mapService';
 import {
-  driverOpenRequests, driverActiveRequest, acceptRequest, releaseRequest, completeRequest, rideErrorKey,
+  driverOpenRequests, driverActiveRequest, releaseRequest, completeRequest, rideErrorKey,
 } from '../services/rideService';
+import {
+  driverOpenRentals, driverMyRentals, acceptRental, withdrawRental, rentErrorKey,
+} from '../services/rentService';
+import { distanceM, formatDistance, bearingDeg } from '../utils/geo';
 import { alertDriver, unlockAudio } from '../utils/alerts';
 import useWakeLock from '../hooks/useWakeLock';
-import DriverHeader from '../components/Driver/DriverHeader';
 import DriverTabs from '../components/Driver/DriverTabs';
 import HomeSheet from '../components/Driver/HomeSheet';
 import DriverMap from '../components/Driver/DriverMap';
 import DriverRequests from '../components/Driver/DriverRequests';
-import RequestPopup from '../components/Driver/RequestPopup';
+import DriverRentals from '../components/Driver/DriverRentals';
 import Profile from './Profile';
-import { distanceM, formatDistance, bearingDeg } from '../utils/geo';
+import AppHeader from '../components/common/AppHeader'
 
 const USE_REAL_GPS = import.meta.env.VITE_USE_REAL_GPS === 'true';
 const MOVING_KMH = 10;
@@ -32,7 +35,10 @@ export default function DriverDashboard() {
   const [signals, setSignals] = useState([]);
   const [requests, setRequests] = useState([]);
   const [active, setActive] = useState(null);
-  const [dismissed, setDismissed] = useState(() => new Set());
+  const [rentOpen, setRentOpen] = useState([]);
+  const [rentMine, setRentMine] = useState([]);
+  const [routeId, setRouteId] = useState(null);
+  const [routeInfo, setRouteInfo] = useState(null);
   const [gps, setGps] = useState(null);
   const [spot, setSpot] = useState('');
   const [loading, setLoading] = useState(true);
@@ -53,11 +59,28 @@ export default function DriverDashboard() {
 
   useWakeLock(isOnline);
 
-   useEffect(() => {
+  // Rentals
+  const loadRentals = useCallback(async () => {
+    try {
+      const [o, m] = await Promise.all([driverOpenRentals(), driverMyRentals()]);
+      setRentOpen(o ?? []);
+      setRentMine(m ?? []);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    if (!verified) { setRentOpen([]); setRentMine([]); return; }
+    loadRentals();
+    const id = setInterval(loadRentals, 10000);
+    return () => clearInterval(id);
+  }, [verified, loadRentals]);
+
+  // Totoong GPS + direksyon
+  useEffect(() => {
     if (!USE_REAL_GPS || !isOnline || !navigator.geolocation) return;
     let last = 0;
     let prev = null;
-    let latest = null; // { h, at }
+    let latest = null;
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
         const here = [pos.coords.latitude, pos.coords.longitude];
@@ -74,7 +97,6 @@ export default function DriverDashboard() {
         if (now - last < 5000) return;
         last = now;
         updateDriver(userId, { current_latitude: here[0], current_longitude: here[1] }).catch(() => {});
-        // Hiwalay na tawag para hindi maapektuhan ang lokasyon kung may problema sa heading
         if (latest && now - latest.at < 15000) {
           updateDriver(userId, { heading_deg: Math.round(latest.h), heading_at: new Date().toISOString() }).catch(() => {});
         }
@@ -84,12 +106,10 @@ export default function DriverDashboard() {
     );
     return () => navigator.geolocation.clearWatch(watchId);
   }, [isOnline, userId]);
+
+  // Lumang solo request (naiwan para sa kasalukuyang aktibong sundo, kung meron)
   useEffect(() => {
-    if (!verified) {
-      setRequests([]);
-      setActive(null);
-      return;
-    }
+    if (!verified) { setRequests([]); setActive(null); return; }
     let stop = false;
     const load = async () => {
       try {
@@ -105,11 +125,9 @@ export default function DriverDashboard() {
     return () => { stop = true; clearInterval(timer); };
   }, [isOnline, verified]);
 
+  // Mga naghihintay sa terminal
   useEffect(() => {
-    if (!isOnline) {
-      setSignals([]);
-      return;
-    }
+    if (!isOnline) { setSignals([]); return; }
     const load = () => getActiveSignals().then(setSignals).catch(() => {});
     load();
     const channel = supabase
@@ -117,20 +135,18 @@ export default function DriverDashboard() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'commuter_signals' }, load)
       .subscribe();
     const timer = setInterval(load, 5000);
-    return () => {
-      supabase.removeChannel(channel);
-      clearInterval(timer);
-    };
+    return () => { supabase.removeChannel(channel); clearInterval(timer); };
   }, [isOnline]);
 
+  // Beep sa bagong rental
   useEffect(() => {
-    for (const r of requests) {
+    for (const r of rentOpen) {
       if (!seen.current.has(r.id)) {
         seen.current.add(r.id);
         alertDriver();
       }
     }
-  }, [requests]);
+  }, [rentOpen]);
 
   const me = useMemo(() => {
     if (gps?.pos) return gps.pos;
@@ -157,6 +173,15 @@ export default function DriverDashboard() {
   const kmh = gps?.speed != null ? gps.speed * 3.6 : 0;
   const moving = kmh > MOVING_KMH;
 
+  const routeR = rentMine.find((x) => x.id === routeId) ?? null;
+  const routeProps = routeR
+    ? {
+        me,
+        pickup: [Number(routeR.pickup_lat), Number(routeR.pickup_lng)],
+        dest: routeR.dest_lat != null ? [Number(routeR.dest_lat), Number(routeR.dest_lng)] : null,
+      }
+    : null;
+
   async function run(action) {
     setBusy(true);
     setError('');
@@ -174,27 +199,12 @@ export default function DriverDashboard() {
     setError(k ? t(k) : e.message);
   };
 
-  async function accept(id) {
-    setBusy(true);
-    setError('');
-    try {
-      setActive(await acceptRequest(id));
-      setRequests([]);
-    } catch (e) {
-      rideErr(e);
-      setRequests(await driverOpenRequests().catch(() => []));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function finish(fn, id) {
     setBusy(true);
     setError('');
     try {
       await fn(id);
       setActive(null);
-      setRequests(await driverOpenRequests().catch(() => []));
     } catch (e) {
       rideErr(e);
     } finally {
@@ -202,7 +212,13 @@ export default function DriverDashboard() {
     }
   }
 
-  const decline = (id) => setDismissed((prev) => new Set(prev).add(id));
+  async function rentAct(fn, id) {
+    setBusy(true);
+    setError('');
+    try { await fn(id); }
+    catch (e) { const k = rentErrorKey(e.message); setError(k ? t(k) : e.message); }
+    finally { await loadRentals(); setBusy(false); }
+  }
 
   function handlePickSpot(e) {
     unlockAudio();
@@ -211,12 +227,7 @@ export default function DriverDashboard() {
     const shed = sheds.find((s) => s.id === id);
     if (!shed) return;
     setGps(null);
-    run(() =>
-      updateDriver(userId, {
-        current_latitude: shed.latitude,
-        current_longitude: shed.longitude,
-      })
-    );
+    run(() => updateDriver(userId, { current_latitude: shed.latitude, current_longitude: shed.longitude }));
   }
 
   if (loading) {
@@ -243,20 +254,24 @@ export default function DriverDashboard() {
     );
   }
 
-  const canReceive = isOnline && verified && !!driver.accepting_requests && driver.status !== 'full' && !active;
-  const popupReq = canReceive && tab !== 'requests' ? requests.find((r) => !dismissed.has(r.id)) : null;
-
   const reqProps = {
     active, requests, isOnline, moving, busy,
     isFull: driver.status === 'full',
     accepting: !!driver.accepting_requests,
-    onAccept: accept,
+    onAccept: () => {},
     onRelease: (id) => finish(releaseRequest, id),
     onComplete: (id) => finish(completeRequest, id),
   };
 
   let banner;
-  if (active) {
+  if (routeR) {
+    banner = (
+      <div className="rounded-2xl bg-violet-600 px-4 py-3 text-white shadow-lg">
+        <p className="text-lg font-extrabold leading-tight">🎉 {t('drv.routeTitle')}</p>
+        <p className="truncate text-xs font-semibold text-white/90">🏁 {routeR.dest_note}</p>
+      </div>
+    );
+  } else if (active) {
     banner = (
       <div className="rounded-2xl bg-amber-500 px-4 py-3 text-white shadow-lg">
         <p className="text-lg font-extrabold leading-tight">
@@ -265,26 +280,17 @@ export default function DriverDashboard() {
         <p className="text-xs font-semibold text-white/90">{t('drv.toDest').replace('{name}', active.dest_name)}</p>
       </div>
     );
-  } else if (requests.length) {
-    banner = (
-      <div className="rounded-2xl bg-amber-500 px-4 py-3 text-white shadow-lg">
-        <p className="text-lg font-extrabold leading-tight">
-          🧍 {t('drv.reqNearby')} · {formatDistance(requests[0].distance_m)}
-        </p>
-        <p className="text-xs font-semibold text-white/90">{t('drv.reqCount').replace('{n}', requests.length)}</p>
-      </div>
-    );
   } else {
     banner = (
       <div className="inline-block rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-gray-600 shadow">
-        {isOnline ? t('drv.reqNone') : t('drv.goOnlineMap')}
+        {isOnline ? t('drv.rentWaitNone') : t('drv.goOnlineMap')}
       </div>
     );
   }
 
   return (
     <div className="flex h-dvh flex-col bg-brand-soft">
-      <DriverHeader plate={driver.tricycle_plate_number} onSignOut={signOut} />
+    <AppHeader badge={driver.tricycle_plate_number} />
 
       {tab === 'home' && (
         <div className="relative min-h-0 flex-1">
@@ -297,6 +303,8 @@ export default function DriverDashboard() {
             banner={banner}
             recenterLabel={t('drv.center')}
             meLabel={t('drv.me')}
+            route={routeProps}
+            onRouteInfo={setRouteInfo}
           />
           <div className="absolute inset-x-0 bottom-0 z-10 mx-auto max-w-md">
             <HomeSheet
@@ -307,6 +315,7 @@ export default function DriverDashboard() {
               error={error}
               active={active}
               requestProps={reqProps}
+              rentRoute={routeR ? { rental: routeR, info: routeInfo, onClose: () => setRouteId(null) } : null}
               onOnline={(v) => { if (v) unlockAudio(); run(() => updateDriver(userId, { is_online: v })); }}
               onAccepting={(v) => { if (v) unlockAudio(); run(() => updateDriver(userId, { accepting_requests: v })); }}
               onStatus={(s) => run(() => updateDriver(userId, { status: s }))}
@@ -323,7 +332,16 @@ export default function DriverDashboard() {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <main className="mx-auto max-w-md space-y-4 px-4 py-4">
             {error && <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-full">{error}</p>}
-            <DriverRequests {...reqProps} />
+            <DriverRentals
+              open={rentOpen}
+              mine={rentMine}
+              waiting={waiting}
+              online={isOnline}
+              busy={busy}
+              onAccept={(id) => rentAct(acceptRental, id)}
+              onWithdraw={(id) => rentAct(withdrawRental, id)}
+              onShowRoute={(id) => { setRouteInfo(null); setRouteId(id); setTab('home'); }}
+            />
           </main>
         </div>
       )}
@@ -334,17 +352,7 @@ export default function DriverDashboard() {
         </div>
       )}
 
-      <DriverTabs tab={tab} onChange={setTab} badge={active ? 0 : requests.length} />
-
-      {popupReq && (
-        <RequestPopup
-          request={popupReq}
-          busy={busy}
-          moving={moving}
-          onAccept={accept}
-          onDecline={decline}
-        />
-      )}
+      <DriverTabs tab={tab} onChange={setTab} badge={rentOpen.length} />
     </div>
   );
 }

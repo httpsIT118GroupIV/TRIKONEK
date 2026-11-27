@@ -2,7 +2,7 @@ import { useLang } from '../../context/LanguageContext';
 
 const TABS = [
   { id: 'home', icon: '🏠', key: 'tab.home' },
-  { id: 'requests', icon: '🔔', key: 'tab.requests' },
+  { id: 'requests', icon: '🎉', key: 'tab.requests' },
   { id: 'profile', icon: '👤', key: 'tab.profile' },
 ];
 

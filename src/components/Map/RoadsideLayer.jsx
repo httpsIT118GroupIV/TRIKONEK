@@ -12,6 +12,7 @@ const pin = (emoji, bg) =>
 
 const WAITING = pin('🧍', '#F59E0B');
 const PICKED = pin('📍', '#E11D48');
+const DEST = pin('🏁', '#7C3AED');
 
 function ClickPicker({ onPick }) {
   useMapEvents({
@@ -22,7 +23,7 @@ function ClickPicker({ onPick }) {
   return null;
 }
 
-export default function RoadsideLayer({ signals = [], picked, picking, onPick, label }) {
+export default function RoadsideLayer({ signals = [], picked, picking, onPick, label, dest }) {
   const map = useMap();
 
   useEffect(() => {
@@ -40,6 +41,7 @@ export default function RoadsideLayer({ signals = [], picked, picking, onPick, l
         </Marker>
       ))}
       {picking && picked && <Marker position={picked} icon={PICKED} />}
+      {dest && <Marker position={dest} icon={DEST} />}
     </>
   );
 }

@@ -2,7 +2,7 @@ import L from 'leaflet';
 
 const shadow = '0 2px 6px rgba(0,0,0,.35)';
 
-export function tricycleIcon(available) {
+export function tricycleIcon(available, dim = false) {
   const color = available ? '#16A34A' : '#E11D48';
   return L.divIcon({
     className: 'trk-marker',
@@ -10,7 +10,7 @@ export function tricycleIcon(available) {
     iconAnchor: [20, 40],
     popupAnchor: [0, -38],
     html: `
-      <div style="position:relative;width:40px;height:40px">
+      <div style="position:relative;width:40px;height:40px;opacity:${dim ? 0.4 : 1};filter:${dim ? 'grayscale(.6)' : 'none'}">
         <div style="width:40px;height:40px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${color};border:3px solid #fff;box-shadow:${shadow}"></div>
         <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px">🛺</span>
       </div>`,
