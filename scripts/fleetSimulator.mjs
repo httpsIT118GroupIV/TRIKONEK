@@ -179,19 +179,30 @@ async function main() {
   };
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);
-
+function bearing(a, b) {
+  const p1 = toRad(a[0]), p2 = toRad(b[0]), dl = toRad(b[1] - a[1]);
+  const y = Math.sin(dl) * Math.cos(p2);
+  const x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
   async function tick() {
     fleet.forEach(step);
     const results = await Promise.all(
       fleet.map((t) => {
-        const [lat, lng] = pointAt(t.route, t.dist);
-        return sb.from('drivers').update({
+        const here = pointAt(t.route, t.dist);
+        const ahead = pointAt(t.route, Math.max(0, Math.min(t.route.total, t.dist + t.dir * 25)));
+        const patch = {
           is_online: true,
           status: t.status,
-          current_latitude: lat,
-          current_longitude: lng,
+          current_latitude: here[0],
+          current_longitude: here[1],
           updated_at: new Date().toISOString(),
-        }).eq('id', t.id);
+        };
+        if (t.pause === 0) {
+          patch.heading_deg = Math.round(bearing(here, ahead));
+          patch.heading_at = new Date().toISOString();
+        }
+        return sb.from('drivers').update(patch).eq('id', t.id);
       })
     );
     results.forEach((r) => r.error && console.error('Update error:', r.error.message));

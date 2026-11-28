@@ -139,7 +139,7 @@ export default function DriverMap({
       <div
         className={
           fill
-            ? 'pointer-events-none absolute left-3 right-14 top-3 z-[1000]'
+            ? 'pointer-events-none absolute inset-x-0 top-3 z-[1000] mx-auto max-w-md px-3 pr-14'
             : 'pointer-events-none absolute inset-x-3 top-3 z-[1000]'
         }
       >

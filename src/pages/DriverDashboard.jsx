@@ -19,7 +19,8 @@ import DriverMap from '../components/Driver/DriverMap';
 import DriverRequests from '../components/Driver/DriverRequests';
 import DriverRentals from '../components/Driver/DriverRentals';
 import Profile from './Profile';
-import AppHeader from '../components/common/AppHeader'
+import AppHeader from '../components/common/AppHeader';
+import NavMap from '../components/Driver/NavMap';
 
 const USE_REAL_GPS = import.meta.env.VITE_USE_REAL_GPS === 'true';
 const MOVING_KMH = 10;
@@ -45,6 +46,7 @@ export default function DriverDashboard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const seen = useRef(new Set());
+  const [navOn, setNavOn] = useState(false);
 
   useEffect(() => {
     getMyDriver(userId)
@@ -290,41 +292,53 @@ export default function DriverDashboard() {
 
   return (
     <div className="flex h-dvh flex-col bg-brand-soft">
-    <AppHeader badge={driver.tricycle_plate_number} />
+      <AppHeader badge={driver.tricycle_plate_number} />
 
       {tab === 'home' && (
         <div className="relative min-h-0 flex-1">
-          <DriverMap
-            fill
-            sheds={sheds}
-            waiting={waiting}
-            pickup={active ? [Number(active.pickup_lat), Number(active.pickup_lng)] : null}
-            me={me}
-            banner={banner}
-            recenterLabel={t('drv.center')}
-            meLabel={t('drv.me')}
-            route={routeProps}
-            onRouteInfo={setRouteInfo}
-          />
-          <div className="absolute inset-x-0 bottom-0 z-10 mx-auto max-w-md">
-            <HomeSheet
-              driver={driver}
-              verified={verified}
-              busy={busy}
-              moving={moving}
-              error={error}
-              active={active}
-              requestProps={reqProps}
-              rentRoute={routeR ? { rental: routeR, info: routeInfo, onClose: () => setRouteId(null) } : null}
-              onOnline={(v) => { if (v) unlockAudio(); run(() => updateDriver(userId, { is_online: v })); }}
-              onAccepting={(v) => { if (v) unlockAudio(); run(() => updateDriver(userId, { accepting_requests: v })); }}
-              onStatus={(s) => run(() => updateDriver(userId, { status: s }))}
-              showDemo={!USE_REAL_GPS}
-              sheds={sheds}
-              spot={spot}
-              onPickSpot={handlePickSpot}
+          {navOn && routeR && routeProps?.dest ? (
+            <NavMap
+              me={me}
+              pickup={routeProps.pickup}
+              dest={routeProps.dest}
+              customer={routeR.customer}
+              onStop={() => setNavOn(false)}
             />
-          </div>
+          ) : (
+            <>
+              <DriverMap
+                fill
+                sheds={sheds}
+                waiting={waiting}
+                pickup={active ? [Number(active.pickup_lat), Number(active.pickup_lng)] : null}
+                me={me}
+                banner={banner}
+                recenterLabel={t('drv.center')}
+                meLabel={t('drv.me')}
+                route={routeProps}
+                onRouteInfo={setRouteInfo}
+              />
+              <div className="absolute inset-x-0 bottom-0 z-10 mx-auto max-w-md">
+                <HomeSheet
+                  driver={driver}
+                  verified={verified}
+                  busy={busy}
+                  moving={moving}
+                  error={error}
+                  active={active}
+                  requestProps={reqProps}
+                  rentRoute={routeR ? { rental: routeR, info: routeInfo, onClose: () => { setRouteId(null); setNavOn(false); }, onStart: () => setNavOn(true) } : null}
+                  onOnline={(v) => { if (v) unlockAudio(); run(() => updateDriver(userId, { is_online: v })); }}
+                  onAccepting={(v) => { if (v) unlockAudio(); run(() => updateDriver(userId, { accepting_requests: v })); }}
+                  onStatus={(s) => run(() => updateDriver(userId, { status: s }))}
+                  showDemo={!USE_REAL_GPS}
+                  sheds={sheds}
+                  spot={spot}
+                  onPickSpot={handlePickSpot}
+                />
+              </div>
+            </>
+          )}
         </div>
       )}
 

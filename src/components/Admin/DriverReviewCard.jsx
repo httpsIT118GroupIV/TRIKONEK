@@ -90,10 +90,6 @@ export default function DriverReviewCard({ d, busy, onApprove, onReject, onRevok
         </div>
       )}
 
-      {status === 'verified' && (
-        <button className="btn-ghost" disabled={busy} onClick={onRevoke}>{t('admin.revoke')}</button>
-      )}
-
       {status === 'rejected' && (
         <button className="btn-ghost" disabled={busy} onClick={onReopen}>{t('admin.reopen')}</button>
       )}

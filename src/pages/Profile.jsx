@@ -99,7 +99,7 @@ export default function Profile({ embedded = false }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-brand-soft text-ink/70">
+      <div className={(embedded ? 'py-10 ' : 'min-h-screen ') + 'flex items-center justify-center bg-brand-soft text-ink/70'}>
         {t('driver.loading')}
       </div>
     );
@@ -112,17 +112,19 @@ export default function Profile({ embedded = false }) {
 
   return (
     <div className={embedded ? '' : 'min-h-screen bg-brand-soft pb-10'}>
-      <header className="flex items-center justify-between bg-brand px-4 py-3">
-        <button
-          onClick={() => nav('/')}
-          aria-label="Back"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-white"
-        >
-          ←
-        </button>
-        <h1 className="text-lg font-extrabold">{t('profile.title')}</h1>
-        <LanguageToggle />
-      </header>
+      {!embedded && (
+        <header className="flex items-center justify-between bg-brand px-4 py-3">
+          <button
+            onClick={() => nav('/')}
+            aria-label="Back"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-white"
+          >
+            ←
+          </button>
+          <h1 className="text-lg font-extrabold">{t('profile.title')}</h1>
+          <LanguageToggle />
+        </header>
+      )}
 
       <main className="mx-auto max-w-md space-y-4 px-4 py-4">
         {/* Account */}

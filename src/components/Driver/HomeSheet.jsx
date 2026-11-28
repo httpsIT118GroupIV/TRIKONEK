@@ -62,6 +62,9 @@ export default function HomeSheet({
           {leg('bg-blue-600', t('drv.legPickup'), info?.toPickup, false)}
           {leg('bg-violet-600', t('drv.legDest'), info?.trip, r.dest_lat == null)}
         </div>
+        {r.dest_lat != null && (
+          <button className="btn-primary" onClick={rentRoute.onStart}>🧭 {t('nav.start')}</button>
+        )}
         <a className="btn-dark flex items-center justify-center" href={`tel:${r.phone}`}>
           📞 {t('drv.rentCall')}
         </a>
@@ -95,7 +98,7 @@ export default function HomeSheet({
             <span>⌃</span>
           </button>
         )}
-        
+
         {active && (
           <div className="[&>section]:border-0 [&>section]:p-0 [&>section]:shadow-none">
             <DriverRequests {...requestProps} />

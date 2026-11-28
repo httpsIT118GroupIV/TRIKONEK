@@ -7,14 +7,15 @@ import { DemoPassenger, DemoDriver } from '../demo/DemoViews';
 
 // Ang role na ipinapakita sa bawat hakbang
 const STEPS = [
-  { role: 'passenger' }, // 1 mga active na tricycle
-  { role: 'passenger' }, // 2 humiling
-  { role: 'driver' },    // 3 nakikita ng driver
-  { role: 'driver' },    // 4 tatanggapin
-  { role: 'passenger' }, // 5 paparating na
-  { role: 'passenger' }, // 6 bayad
-  { role: 'driver' },    // 7 tapos na
-  { role: 'passenger' }, // 8 terminal at sticker
+  { role: 'passenger' }, // 1 lahat ng active
+  { role: 'passenger' }, // 2 paparating lang
+  { role: 'passenger' }, // 3 may naghihintay
+  { role: 'passenger' }, // 4 mag-rent
+  { role: 'driver' },    // 5 nakikita ng driver
+  { role: 'driver' },    // 6 tatanggapin
+  { role: 'passenger' }, // 7 kumpirmado
+  { role: 'driver' },    // 8 ruta sa mapa
+  { role: 'passenger' }, // 9 bayad
 ];
 
 function useIsDesktop() {
@@ -62,18 +63,19 @@ export default function Demo() {
 
   const go = (i) => setStep((s) => Math.max(s, i));
   const sim = useDemoSim((e) => {
-    if (e === 'created') go(2);
-    if (e === 'accepted') go(4);
-    if (e === 'completed') go(7);
+    if (e === 'signal') go(3);
+    if (e === 'rental') go(4);
+    if (e === 'accepted') go(6);
+    if (e === 'route') go(7);
   });
 
   useEffect(() => { setRole(STEPS[step].role); }, [step]);
 
   function next() {
-    if (step === 1) sim.ensureRequest();
-    if (step === 3) sim.ensureAccepted();
-    if (step === 4) sim.arrive();
-    if (step === 6) sim.ensureCompleted();
+    if (step === 2) sim.ensureSignal();
+    if (step === 3) sim.ensureRental();
+    if (step === 5) sim.ensureAccepted();
+    if (step === 7) sim.ensureRoute();
     setStep(Math.min(step + 1, STEPS.length - 1));
   }
 
@@ -87,8 +89,8 @@ export default function Demo() {
   const stepRole = STEPS[step].role;
   const last = step === STEPS.length - 1;
 
-  const passenger = <DemoPassenger key={`p${runId}`} sim={sim} payId={payId} setPayId={setPayId} />;
-  const driver = <DemoDriver key={`d${runId}`} sim={sim} />;
+  const passenger = <DemoPassenger key={`p${runId}`} sim={sim} step={step} payId={payId} setPayId={setPayId} />;
+  const driver = <DemoDriver key={`d${runId}`} sim={sim} step={step} />;
 
   return (
     <div className="min-h-screen bg-brand-soft pb-10">
@@ -120,8 +122,8 @@ export default function Demo() {
               {stepRole === 'passenger' ? `🧍 ${t('dm.passenger')}` : `🛺 ${t('dm.driver')}`}
             </span>
           </div>
-          <h2 className="text-xl font-extrabold leading-tight">{t(`dm.s${step + 1}.t`)}</h2>
-          <p className="text-sm text-gray-600">{t(`dm.s${step + 1}.d`)}</p>
+          <h2 className="text-xl font-extrabold leading-tight">{t(`dn.s${step + 1}.t`)}</h2>
+          <p className="text-sm text-gray-600">{t(`dn.s${step + 1}.d`)}</p>
 
           <div className="flex gap-1.5">
             {STEPS.map((_, i) => (
@@ -167,7 +169,11 @@ export default function Demo() {
             <Phone desktop label={`🛺 ${t('dm.driver')}`} active={stepRole === 'driver'}>{driver}</Phone>
           </div>
         ) : (
-          <Phone>{role === 'passenger' ? passenger : driver}</Phone>
+          // Parehong naka-mount para hindi mawala ang napili sa bawat screen
+          <Phone>
+            <div className={'absolute inset-0 ' + (role === 'passenger' ? '' : 'invisible')}>{passenger}</div>
+            <div className={'absolute inset-0 ' + (role === 'driver' ? '' : 'invisible')}>{driver}</div>
+          </Phone>
         )}
 
         <p className="text-center text-xs text-gray-500">{t('dm.note')}</p>

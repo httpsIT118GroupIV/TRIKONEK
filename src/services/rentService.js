@@ -30,3 +30,9 @@ export function rentErrorKey(message = '') {
   const c = CODES.find((x) => message.includes(x));
   return c ? `rent.err.${c}` : null;
 }
+
+export const rentQuote = (lat, lng, dlat, dlng) =>
+  rpc('rent_quote', { p_lat: lat, p_lng: lng, p_dlat: dlat, p_dlng: dlng });
+export const fareTable = (originId) => rpc('fare_table', { p_origin: originId });
+export const adminRentals = () => rpc('admin_rentals');
+export const adminCancelRental = (id) => rpc('admin_cancel_rental', { p_id: id });

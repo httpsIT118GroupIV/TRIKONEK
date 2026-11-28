@@ -9,6 +9,10 @@ const FIELDS = [
   { key: 'night_end_hour', label: 'set.nightEnd', min: 0, max: 23, int: true },
   { key: 'discount_rate', label: 'set.discount', hint: 'set.discountHint', min: 0, max: 100, percent: true },
   { key: 'min_fare', label: 'set.minFare', hint: 'set.minFareHint', min: 1, max: 500 },
+    { key: 'rent_base_fare', label: 'set.rentBase', hint: 'set.rentBaseHint', min: 0, max: 5000 },
+  { key: 'rent_per_km', label: 'set.rentKm', hint: 'set.rentKmHint', min: 0, max: 500 },
+  { key: 'rent_radius_m', label: 'set.rentRadius', hint: 'set.rentRadiusHint', min: 500, max: 30000, int: true },
+  { key: 'special_multiplier', label: 'set.special', hint: 'set.specialHint', min: 1, max: 10 },
 ];
 
 export default function SettingsPanel() {

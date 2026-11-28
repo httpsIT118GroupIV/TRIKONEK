@@ -8,7 +8,7 @@ import ShedMarker from './ShedMarker';
 const CENTER = [13.29, 123.42];
 const FALLBACK = L.latLngBounds([13.26, 123.35], [13.31, 123.5]);
 
-function BoundsLock({ sheds }) {
+function BoundsLock({ sheds, bottom = 0 }) {
   const map = useMap();
   useEffect(() => {
     const pts = sheds.map((s) => [Number(s.latitude), Number(s.longitude)]);
@@ -16,8 +16,8 @@ function BoundsLock({ sheds }) {
     const bounds = base.pad(0.25);
     map.setMinZoom(map.getBoundsZoom(bounds));
     map.setMaxBounds(bounds);
-    map.fitBounds(bounds);
-  }, [sheds, map]);
+    map.fitBounds(base.pad(0.1), { paddingBottomRight: [0, bottom] });
+  }, [sheds, map, bottom]);
   return null;
 }
 

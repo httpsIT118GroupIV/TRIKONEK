@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useLang } from '../../context/LanguageContext';
 import useProfile from '../../hooks/useProfile';
 import { isInsideArea } from '../../services/mapService';
-import { createRental, myRentals, cancelRental, rentRate, rentErrorKey } from '../../services/rentService';
+import { createRental, myRentals, cancelRental, rentRate, rentQuote, rentErrorKey } from '../../services/rentService';
 
 const peso = (n) => `₱${Number(n).toLocaleString('en-PH')}`;
 const pad = (n) => String(n).padStart(2, '0');
@@ -35,7 +35,12 @@ export default function RentPanel({ mode, setMode, picked, setPicked, pickedDest
   useEffect(() => {
     if (profile?.phone) setPhone((p) => p || profile.phone);
   }, [profile?.phone]);
-
+  
+  useEffect(() => {
+    if (picked && pickedDest) {
+      rentQuote(picked[0], picked[1], pickedDest[0], pickedDest[1]).then((r) => setRate(Number(r))).catch(() => {});
+    }
+  }, [picked, pickedDest]);
   const fmt = (iso) =>
     new Date(iso).toLocaleString(lang === 'tl' ? 'fil-PH' : 'en-PH', { dateStyle: 'medium', timeStyle: 'short' });
 

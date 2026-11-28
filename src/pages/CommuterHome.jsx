@@ -17,6 +17,7 @@ import Sheet from '../components/Commuter/Sheet';
 import AppHeader from '../components/common/AppHeader';
 import AppTabs from '../components/common/AppTabs';
 import Profile from './Profile';
+import FaresTable from '../components/Commuter/FaresTable';
 
 export default function CommuterHome() {
   const { session } = useAuth();
@@ -93,8 +94,10 @@ export default function CommuterHome() {
 
   const TABS = [
     { id: 'home', icon: '🛺', label: t('tab.home') },
+    { id: 'fares', icon: '💰', label: t('tab.fares') },
     { id: 'rent', icon: '🎉', label: t('tab.rent') },
     { id: 'profile', icon: '👤', label: t('tab.profile') },
+  
   ];
 
   const legend = [
@@ -109,10 +112,11 @@ export default function CommuterHome() {
     <div className="flex h-dvh flex-col bg-brand-soft">
       <AppHeader badge={`● ${drivers.length} ${t('map.online')}`} />
 
-      {tab !== 'profile' && (
+      {(tab === 'home' || tab === 'rent') && (
         <div className="relative isolate min-h-0 flex-1">
           <div className="absolute inset-0">
             <MapView
+              fitBottom={Math.round(window.innerHeight * 0.35)}
               sheds={sheds}
               drivers={drivers}
               highlightIds={highlightIds}
@@ -122,6 +126,7 @@ export default function CommuterHome() {
               onCancel={handleCancelSignal}
               onSelect={tab === 'home' ? selectDriver : undefined}
               extra={
+                
                 <>
                   <RoadsideLayer
                     signals={pins}
@@ -182,6 +187,9 @@ export default function CommuterHome() {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <Profile embedded />
         </div>
+      )}
+       {tab === 'fares' && (
+        <div className="min-h-0 flex-1 overflow-y-auto"><FaresTable /></div>
       )}
 
       <AppTabs tabs={TABS} tab={tab} onChange={(x) => { setTab(x); setSelectedId(null); }} />
