@@ -1,19 +1,27 @@
 import { useEffect, useState } from 'react';
-import QrVisibility from '../components/Driver/QrVisibility';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { useLang } from '../context/LanguageContext';
 import useProfile from '../hooks/useProfile';
 import { getMyDriver, updateDriver, uploadQr } from '../services/driverService';
 import QrUpload from '../components/Driver/QrUpload';
-import LanguageToggle from '../components/common/LanguageToggle';
-import { Link, useNavigate } from 'react-router-dom';
+import QrVisibility from '../components/Driver/QrVisibility';
 
 const BADGE = {
   verified: 'bg-emerald-50 text-available',
   pending: 'bg-amber-50 text-accent',
   rejected: 'bg-rose-50 text-full',
 };
+
+function Field({ label, children }) {
+  return (
+    <label className="ios-row">
+      <span className="shrink-0 font-medium">{label}</span>
+      {children}
+    </label>
+  );
+}
 
 export default function Profile({ embedded = false }) {
   const nav = useNavigate();
@@ -57,9 +65,7 @@ export default function Profile({ embedded = false }) {
 
   async function saveProfile(e) {
     e.preventDefault();
-    setPErr('');
-    setPMsg('');
-    setPBusy(true);
+    setPErr(''); setPMsg(''); setPBusy(true);
     const { error } = await supabase.rpc('update_my_profile', { p_full_name: fullName, p_phone: phone });
     setPBusy(false);
     if (error) return setPErr(error.message);
@@ -69,8 +75,7 @@ export default function Profile({ embedded = false }) {
 
   async function saveDriver(e) {
     e.preventDefault();
-    setDErr('');
-    setDMsg('');
+    setDErr(''); setDMsg('');
     if (!form.plate.trim()) return setDErr(t('profile.plateRequired'));
     setDBusy(true);
     try {
@@ -88,21 +93,13 @@ export default function Profile({ embedded = false }) {
     }
   }
 
+  // Walang try/catch dito: ang QrUpload ang magpapakita ng error
   async function handleQr(file) {
-    setDErr('');
-    try {
-      setDriver(await uploadQr(userId, file));
-    } catch (err) {
-      setDErr(err.message);
-    }
+    setDriver(await uploadQr(userId, file));
   }
 
   if (loading) {
-    return (
-      <div className={(embedded ? 'py-10 ' : 'min-h-screen ') + 'flex items-center justify-center bg-brand-soft text-ink/70'}>
-        {t('driver.loading')}
-      </div>
-    );
+    return <div className="flex min-h-[50vh] items-center justify-center text-ink/70">{t('driver.loading')}</div>;
   }
 
   const name = profile?.full_name || profile?.username || '';
@@ -113,120 +110,112 @@ export default function Profile({ embedded = false }) {
   return (
     <div className={embedded ? '' : 'min-h-screen bg-brand-soft pb-10'}>
       {!embedded && (
-        <header className="flex items-center justify-between bg-brand px-4 py-3">
-          <button
-            onClick={() => nav('/')}
-            aria-label="Back"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-white"
-          >
-            ←
-          </button>
-          <h1 className="text-lg font-extrabold">{t('profile.title')}</h1>
-          <LanguageToggle />
+        <header className="flex items-center bg-brand px-4 py-3">
+          <button onClick={() => nav(-1)} aria-label="Back"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-white">←</button>
+          <h1 className="flex-1 pr-9 text-center text-lg font-extrabold">{t('profile.title')}</h1>
         </header>
       )}
 
-      <main className="mx-auto max-w-md space-y-4 px-4 py-4">
+      <main className="mx-auto max-w-md px-4 py-4">
+        {/* Avatar */}
+        <div className="flex flex-col items-center pb-2 pt-2 text-center">
+          <span className="flex h-20 w-20 items-center justify-center rounded-full bg-brand text-3xl font-extrabold">{initial}</span>
+          <p className="mt-2 text-xl font-extrabold leading-tight">{name}</p>
+          <p className="text-sm text-gray-500">{profile?.email}</p>
+          {role && (
+            <span className="mt-1.5 rounded-full bg-white px-3 py-0.5 text-xs font-bold">{t(`role.${role}`)}</span>
+          )}
+        </div>
+
         {/* Account */}
-        <section className="card">
-          <div className="flex items-center gap-3">
-            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand text-2xl font-extrabold">
-              {initial}
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-lg font-extrabold leading-tight">{name}</p>
-              <p className="truncate text-sm text-gray-500">{profile?.email}</p>
-              {role && (
-                <span className="mt-1 inline-block rounded-full bg-brand-soft px-2.5 py-0.5 text-xs font-bold">
-                  {t(`role.${role}`)}
-                </span>
-              )}
-            </div>
+        <form onSubmit={saveProfile}>
+          <div className="ios-group mt-3">
+            <Field label={t('profile.fullName')}>
+              <input className="ios-input" value={fullName} maxLength={80} autoComplete="name"
+                onChange={(e) => setFullName(e.target.value)} />
+            </Field>
+            <Field label={t('profile.phone')}>
+              <input className="ios-input" type="tel" inputMode="tel" placeholder="09xx xxx xxxx"
+                value={phone} maxLength={20} autoComplete="tel" onChange={(e) => setPhone(e.target.value)} />
+            </Field>
           </div>
+          {pErr && <p className="mt-2 rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-full">{pErr}</p>}
+          {pMsg && <p className="mt-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-available">{pMsg}</p>}
+          <button type="submit" className="btn-primary mt-3" disabled={pBusy}>
+            {pBusy ? t('profile.saving') : t('profile.save')}
+          </button>
+        </form>
 
-          <form onSubmit={saveProfile} className="mt-4 space-y-3">
-            <div>
-              <label className="label" htmlFor="fullName">{t('profile.fullName')}</label>
-              <input id="fullName" className="input" value={fullName} maxLength={80}
-                onChange={(e) => setFullName(e.target.value)} autoComplete="name" />
-            </div>
-            <div>
-              <label className="label" htmlFor="phone">{t('profile.phone')}</label>
-              <input id="phone" className="input" type="tel" inputMode="tel" placeholder="09xx xxx xxxx"
-                value={phone} maxLength={20} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" />
-            </div>
-            {pErr && <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-full">{pErr}</p>}
-            {pMsg && <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-available">{pMsg}</p>}
-            <button type="submit" className="btn-primary" disabled={pBusy}>
-              {pBusy ? t('profile.saving') : t('profile.save')}
-            </button>
-          </form>
-        </section>
-
-        {/* Driver details */}
+        {/* Driver */}
         {role === 'driver' && driver && (
           <>
-            <section className="card">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-base font-extrabold">{t('profile.driverDetails')}</h3>
-                <span className={'rounded-full px-2.5 py-1 text-xs font-bold ' + (BADGE[status] || BADGE.pending)}>
-                  {t(`verify.${status}`)}
-                </span>
-              </div>
-
-              <form onSubmit={saveDriver} className="mt-3 space-y-3">
-                <div>
-                  <label className="label" htmlFor="plate">{t('field.plate')}</label>
-                  <input id="plate" className="input" value={form.plate} disabled={locked}
+            <form onSubmit={saveDriver}>
+              <p className="ios-head">{t('profile.driverDetails')}</p>
+              <div className="ios-group">
+                <div className="ios-row">
+                  <span className="font-medium">Status</span>
+                  <span className={'rounded-full px-2.5 py-1 text-xs font-bold ' + (BADGE[status] || BADGE.pending)}>
+                    {t(`verify.${status}`)}
+                  </span>
+                </div>
+                <Field label={t('field.plate')}>
+                  <input className="ios-input" value={form.plate} disabled={locked}
                     onChange={(e) => setForm({ ...form, plate: e.target.value })} />
-                </div>
-                <div>
-                  <label className="label" htmlFor="toda">{t('profile.toda')}</label>
-                  <input id="toda" className="input" value={form.toda} disabled={locked}
+                </Field>
+                <Field label={t('profile.toda')}>
+                  <input className="ios-input" value={form.toda} disabled={locked}
                     onChange={(e) => setForm({ ...form, toda: e.target.value })} />
-                </div>
-                <div>
-                  <label className="label" htmlFor="franchise">{t('profile.franchise')}</label>
-                  <input id="franchise" className="input" value={form.franchise} disabled={locked}
+                </Field>
+                <Field label={t('profile.franchise')}>
+                  <input className="ios-input" value={form.franchise} disabled={locked}
                     onChange={(e) => setForm({ ...form, franchise: e.target.value })} />
-                </div>
-
-                <div>
-                  <span className="label">{t('profile.line')}</span>
-                  <p className="rounded-xl bg-gray-50 px-4 py-3 text-sm">
+                </Field>
+                <div className="ios-row">
+                  <span className="shrink-0 font-medium">{t('profile.line')}</span>
+                  <span className="text-right text-sm text-gray-600">
                     {driver.line ? t(`line.${driver.line}`) : t('profile.lineNone')}
-                  </p>
+                  </span>
                 </div>
+              </div>
+              {locked && <p className="ios-foot">{t('profile.locked')}</p>}
+              {dErr && <p className="mt-2 rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-full">{dErr}</p>}
+              {dMsg && <p className="mt-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-available">{dMsg}</p>}
+              {!locked && (
+                <button type="submit" className="btn-primary mt-3" disabled={dBusy}>
+                  {dBusy ? t('profile.saving') : t('profile.save')}
+                </button>
+              )}
+            </form>
 
-                {locked ? (
-                  <p className="rounded-xl bg-gray-50 px-4 py-3 text-xs text-gray-500">{t('profile.locked')}</p>
-                ) : (
-                  <button type="submit" className="btn-primary" disabled={dBusy}>
-                    {dBusy ? t('profile.saving') : t('profile.save')}
-                  </button>
-                )}
-                {dErr && <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-full">{dErr}</p>}
-                {dMsg && <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-available">{dMsg}</p>}
-              </form>
-            </section>
+            <QrUpload qrUrl={driver.qr_code_url} onUpload={handleQr} />
 
-              <QrUpload qrUrl={driver.qr_code_url} onUpload={handleQr} />
-              <QrVisibility driver={driver} onChange={setDriver} />            {locked && (
-              <Link
-                to={`/sticker/${encodeURIComponent(driver.tricycle_plate_number)}`}
-                className="btn-dark flex items-center justify-center"
-              >
-                🖨️ {t('sticker.open')}
-              </Link>
+            <div className="mt-3 [&>section]:rounded-2xl [&>section]:border-0 [&>section]:shadow-none">
+              <QrVisibility driver={driver} onChange={setDriver} />
+            </div>
+
+            {locked && (
+              <div className="ios-group mt-3">
+                <Link to={`/sticker/${encodeURIComponent(driver.tricycle_plate_number)}`} className="ios-row font-semibold">
+                  <span>🖨️ {t('sticker.open')}</span>
+                  <span className="text-gray-400">›</span>
+                </Link>
+              </div>
             )}
-            
           </>
         )}
 
-        <Link to="/faq" className="btn-ghost flex items-center justify-center">❓ {t('menu.faq')}</Link>
-        <button onClick={signOut} className="btn-dark">{t('common.signOut')}</button>
-        
-        </main>
+        {/* Iba pa */}
+        <div className="ios-group mt-5">
+          <Link to="/faq" className="ios-row font-semibold">
+            <span>❓ {t('menu.faq')}</span>
+            <span className="text-gray-400">›</span>
+          </Link>
+          <button onClick={signOut} className="ios-row w-full justify-center font-semibold text-full">
+            {t('common.signOut')}
+          </button>
+        </div>
+      </main>
     </div>
   );
 }

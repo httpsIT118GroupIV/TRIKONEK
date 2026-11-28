@@ -24,7 +24,7 @@ export default function FaresTable() {
 
   const cols = [
     ['regular', 'fares.regular'], ['discounted', 'fares.student'],
-    ['discounted', 'fares.senior'], ['discounted', 'fares.pwd'], ['special', 'fares.special'],
+    ['discounted', 'fares.senior'], ['discounted', 'fares.pwd'],
   ];
 
   return (

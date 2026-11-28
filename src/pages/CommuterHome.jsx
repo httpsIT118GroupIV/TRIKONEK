@@ -12,12 +12,15 @@ import RoadsideLayer from '../components/Map/RoadsideLayer';
 import PaymentSelector from '../components/Commuter/PaymentSelector';
 import ActiveTricycles from '../components/Commuter/ActiveTricycles';
 import RentPanel from '../components/Commuter/RentPanel';
+import FaresTable from '../components/Commuter/FaresTable';
+import WaitBox from '../components/Commuter/WaitBox';
 import DriverCard from '../components/Commuter/DriverCard';
 import Sheet from '../components/Commuter/Sheet';
 import AppHeader from '../components/common/AppHeader';
 import AppTabs from '../components/common/AppTabs';
 import Profile from './Profile';
-import FaresTable from '../components/Commuter/FaresTable';
+import ChatSheet from '../components/common/ChatSheet';
+import { chatSummary, unreadKeys } from '../services/rentService';
 
 export default function CommuterHome() {
   const { session } = useAuth();
@@ -32,10 +35,18 @@ export default function CommuterHome() {
   const [payId, setPayId] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [focus, setFocus] = useState(null);
-  const [tab, setTab] = useState('home'); // home | rent | profile
+  const [tab, setTab] = useState('home'); // home | fares | rent | profile
+  const [chat, setChat] = useState(null);
+  const [unread, setUnread] = useState(new Set());
+
+  // Rent
   const [rentMode, setRentMode] = useState('list'); // list | form | pick | pickDest
   const [picked, setPicked] = useState(null);
   const [pickedDest, setPickedDest] = useState(null);
+
+  // Naghihintay (para sa mga driver)
+  const [waitMode, setWaitMode] = useState('idle'); // idle | pick
+  const [waitPicked, setWaitPicked] = useState(null);
 
   const f = useTricycleFilter(drivers, sheds);
 
@@ -47,6 +58,13 @@ export default function CommuterHome() {
   }, [userId]);
 
   useEffect(() => {
+    const load = () => chatSummary().then((s) => setUnread(unreadKeys(s))).catch(() => {});
+    load();
+    const id = setInterval(load, 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
     getSheds().then(setSheds).catch((e) => setError(e.message));
     refreshDrivers();
     refreshSignals();
@@ -54,12 +72,13 @@ export default function CommuterHome() {
       .channel('drivers-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, refreshDrivers)
       .subscribe();
-    const timer = setInterval(refreshDrivers, 3000);
+    const timer = setInterval(() => { refreshDrivers(); refreshSignals(); }, 3000);
     return () => { supabase.removeChannel(channel); clearInterval(timer); };
   }, [refreshDrivers, refreshSignals]);
 
   const shedSignals = signals.filter((s) => s.shed_id);
   const waitingByShed = Object.fromEntries(shedSignals.map((s) => [s.shed_id, s.id]));
+  const roadsideActive = signals.find((s) => !s.shed_id) ?? null;
   const payDriver = drivers.find((d) => d.id === payId);
   const selected = drivers.find((d) => d.id === selectedId) ?? null;
   const selectedRow = f.rows.find((r) => r.driver.id === selectedId) ?? null;
@@ -67,10 +86,25 @@ export default function CommuterHome() {
   const dimming = tab === 'home' && f.mode === 'route' && f.ready;
   const highlightIds = dimming ? new Set(f.rows.map((r) => r.driver.id)) : null;
 
-  const pins =
-    tab === 'rent' && (rentMode === 'form' || rentMode === 'pickDest') && picked
-      ? [{ id: 'draft', latitude: picked[0], longitude: picked[1] }]
-      : [];
+  const rentPicking = tab === 'rent' && (rentMode === 'pick' || rentMode === 'pickDest');
+  const waitPicking = tab === 'home' && waitMode === 'pick';
+
+  let pins = [];
+  if (tab === 'rent' && (rentMode === 'form' || rentMode === 'pickDest') && picked) {
+    pins = [{ id: 'draft', latitude: picked[0], longitude: picked[1] }];
+  } else if (tab === 'home' && roadsideActive && roadsideActive.latitude != null) {
+    pins = [{ id: roadsideActive.id, latitude: roadsideActive.latitude, longitude: roadsideActive.longitude }];
+  }
+
+  let layerPicked = null;
+  let onLayerPick = () => {};
+  if (tab === 'home') {
+    layerPicked = waitPicked;
+    onLayerPick = setWaitPicked;
+  } else if (tab === 'rent') {
+    layerPicked = rentMode === 'pickDest' ? pickedDest : picked;
+    onLayerPick = rentMode === 'pickDest' ? setPickedDest : setPicked;
+  }
 
   function selectDriver(id) {
     const d = drivers.find((x) => x.id === id);
@@ -97,7 +131,6 @@ export default function CommuterHome() {
     { id: 'fares', icon: '💰', label: t('tab.fares') },
     { id: 'rent', icon: '🎉', label: t('tab.rent') },
     { id: 'profile', icon: '👤', label: t('tab.profile') },
-  
   ];
 
   const legend = [
@@ -108,15 +141,16 @@ export default function CommuterHome() {
   ];
   if (dimming) legend.push({ color: 'bg-gray-300', label: t('map.fadedNote') });
 
+  const showMap = tab === 'home' || tab === 'rent';
+
   return (
     <div className="flex h-dvh flex-col bg-brand-soft">
       <AppHeader badge={`● ${drivers.length} ${t('map.online')}`} />
 
-      {(tab === 'home' || tab === 'rent') && (
+      {showMap && (
         <div className="relative isolate min-h-0 flex-1">
           <div className="absolute inset-0">
             <MapView
-              fitBottom={Math.round(window.innerHeight * 0.35)}
               sheds={sheds}
               drivers={drivers}
               highlightIds={highlightIds}
@@ -126,13 +160,12 @@ export default function CommuterHome() {
               onCancel={handleCancelSignal}
               onSelect={tab === 'home' ? selectDriver : undefined}
               extra={
-                
                 <>
                   <RoadsideLayer
                     signals={pins}
-                    picked={rentMode === 'pickDest' ? pickedDest : picked}
-                    picking={tab === 'rent' && (rentMode === 'pick' || rentMode === 'pickDest')}
-                    onPick={rentMode === 'pickDest' ? setPickedDest : setPicked}
+                    picked={layerPicked}
+                    picking={rentPicking || waitPicking}
+                    onPick={onLayerPick}
                     dest={tab === 'rent' && rentMode === 'form' ? pickedDest : null}
                     label={t('wait.me')}
                   />
@@ -166,7 +199,17 @@ export default function CommuterHome() {
                 onClose={() => setSelectedId(null)}
               />
             ) : tab === 'home' ? (
-              <Sheet key="home" title={t('tab.tricycles')}>
+              <Sheet key="home" title={t('tab.tricycles')} forceOpen={waitMode === 'pick'}>
+                <WaitBox
+                  userId={userId}
+                  sheds={sheds}
+                  active={roadsideActive}
+                  mode={waitMode}
+                  setMode={setWaitMode}
+                  picked={waitPicked}
+                  setPicked={setWaitPicked}
+                  onChanged={refreshSignals}
+                />
                 <ActiveTricycles f={f} sheds={sheds} />
               </Sheet>
             ) : (
@@ -176,6 +219,7 @@ export default function CommuterHome() {
                   picked={picked} setPicked={setPicked}
                   pickedDest={pickedDest} setPickedDest={setPickedDest}
                   sheds={sheds}
+                  onChat={setChat} unread={unread}
                 />
               </Sheet>
             )}
@@ -183,17 +227,20 @@ export default function CommuterHome() {
         </div>
       )}
 
-      {tab === 'profile' && (
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <Profile embedded />
-        </div>
-      )}
-       {tab === 'fares' && (
+      {tab === 'fares' && (
         <div className="min-h-0 flex-1 overflow-y-auto"><FaresTable /></div>
       )}
 
-      <AppTabs tabs={TABS} tab={tab} onChange={(x) => { setTab(x); setSelectedId(null); }} />
+      {tab === 'profile' && (
+        <div className="min-h-0 flex-1 overflow-y-auto"><Profile embedded /></div>
+      )}
 
+      <AppTabs
+        tabs={TABS}
+        tab={tab}
+        onChange={(x) => { setTab(x); setSelectedId(null); setWaitMode('idle'); setWaitPicked(null); }}
+      />
+      {chat && <ChatSheet {...chat} onClose={() => setChat(null)} />}
       {payId && <PaymentSelector driver={payDriver} onClose={() => setPayId(null)} />}
     </div>
   );

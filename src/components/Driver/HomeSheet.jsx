@@ -4,6 +4,7 @@ import { formatDistance } from '../../utils/geo';
 import DriverRequests from './DriverRequests';
 import TripsChip from './TripsChip';
 
+
 function MiniSwitch({ checked }) {
   return (
     <span className={'relative h-6 w-11 shrink-0 rounded-full transition ' + (checked ? 'bg-available' : 'bg-gray-300')}>
@@ -14,6 +15,7 @@ function MiniSwitch({ checked }) {
 
 export default function HomeSheet({
   driver, verified, busy, moving, error, active, requestProps, rentRoute,
+  roadside = [], onGo,
   onOnline, onAccepting, onStatus,
   showDemo, sheds, spot, onPickSpot,
 }) {
@@ -162,6 +164,23 @@ export default function HomeSheet({
               </button>
             </div>
 
+            {online && (
+              <div className="space-y-2 rounded-2xl bg-amber-50 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-gray-500">🧍 {t('drv.wpTitle')}</p>
+                {roadside.length === 0 ? (
+                  <p className="text-sm text-gray-500">{t('drv.wpNone')}</p>
+                ) : roadside.map((w) => (
+                  <div key={w.id} className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold">
+                      {w.dist != null ? t('drv.wpAway').replace('{d}', formatDistance(w.dist)) : t('drv.roadside')}
+                    </p>
+                    <button className="h-9 rounded-full bg-brand px-4 text-sm font-extrabold active:scale-95" onClick={() => onGo(w)}>
+                      🧭 {t('drv.wpGo')}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex items-center gap-3 rounded-2xl bg-brand-soft px-3 py-2.5">
               <span className="text-lg">🛣️</span>
               <p className="min-w-0 flex-1 text-xs font-bold leading-snug">

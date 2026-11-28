@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLang } from '../../context/LanguageContext';
 import useProfile from '../../hooks/useProfile';
+import ChatSheet from '../common/ChatSheet';
 import { isInsideArea } from '../../services/mapService';
-import { createRental, myRentals, cancelRental, rentRate, rentQuote, rentErrorKey } from '../../services/rentService';
+import {
+  createRental, myRentals, cancelRental, rentRate, rentQuote, rentErrorKey,
+  chatSummary, unreadKeys,
+} from '../../services/rentService';
 
 const peso = (n) => `₱${Number(n).toLocaleString('en-PH')}`;
 const pad = (n) => String(n).padStart(2, '0');
 const toLocalInput = (d) =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
-export default function RentPanel({ mode, setMode, picked, setPicked, pickedDest, setPickedDest, sheds }) {
-  const { t, lang } = useLang();
+export default function RentPanel({ mode, setMode, picked, setPicked, pickedDest, setPickedDest, sheds, onChat, unread }) {
+      const { t, lang } = useLang();
   const { profile } = useProfile();
 
   const [mine, setMine] = useState([]);
@@ -23,24 +27,29 @@ export default function RentPanel({ mode, setMode, picked, setPicked, pickedDest
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  const load = useCallback(() => { myRentals().then(setMine).catch(() => {}); }, []);
+  const load = useCallback(() => {
+    myRentals().then(setMine).catch(() => {});
+  }, []);
 
   useEffect(() => {
     load();
     rentRate().then((r) => setRate(Number(r))).catch(() => {});
-    const id = setInterval(load, 10000);
+    const id = setInterval(load, 5000);
     return () => clearInterval(id);
   }, [load]);
 
   useEffect(() => {
     if (profile?.phone) setPhone((p) => p || profile.phone);
   }, [profile?.phone]);
-  
+
   useEffect(() => {
     if (picked && pickedDest) {
-      rentQuote(picked[0], picked[1], pickedDest[0], pickedDest[1]).then((r) => setRate(Number(r))).catch(() => {});
+      rentQuote(picked[0], picked[1], pickedDest[0], pickedDest[1])
+        .then((r) => setRate(Number(r)))
+        .catch(() => {});
     }
   }, [picked, pickedDest]);
+
   const fmt = (iso) =>
     new Date(iso).toLocaleString(lang === 'tl' ? 'fil-PH' : 'en-PH', { dateStyle: 'medium', timeStyle: 'short' });
 
@@ -213,8 +222,15 @@ export default function RentPanel({ mode, setMode, picked, setPicked, pickedDest
                     <div className="rounded-xl bg-gray-50 p-2 text-xs">
                       <p className="mb-1 font-bold text-gray-500">{t('rent.drivers')}</p>
                       {r.drivers.map((d, i) => (
-                        <p key={i}>🛺 <b>{d.plate}</b> · {d.first_name}{d.toda ? ` · ${d.toda}` : ''}</p>
+                        <p key={i} className="py-0.5">🛺 <b>{d.plate}</b> · {d.first_name}{d.toda ? ` · ${d.toda}` : ''}</p>
                       ))}
+                      <button
+                        className="relative mt-2 w-full rounded-full bg-brand px-3 py-2 text-sm font-extrabold"
+                        onClick={() => onChat({ rentalId: r.id, title: `${t('chat.group')} · ${r.dest_note}` })}
+                      >
+                        💬 {t('chat.group')} ({r.drivers.length + 1})
+                        {unread.has(r.id) && <span className="absolute right-3 top-2 h-3 w-3 rounded-full bg-full" />}
+                      </button>
                     </div>
                   )}
 

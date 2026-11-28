@@ -5,65 +5,66 @@ export default function QrUpload({ qrUrl, onUpload, disabled }) {
   const { t } = useLang();
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState('');
-  const [errorKey, setErrorKey] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
   function handlePick(e) {
     const f = e.target.files[0];
-    setErrorKey('');
+    setError('');
     if (!f) return;
-    if (!f.type.startsWith('image/')) return setErrorKey('qr.errType');
-    if (f.size > 2 * 1024 * 1024) return setErrorKey('qr.errSize');
+    if (!f.type.startsWith('image/')) return setError(t('qr.errType'));
+    if (f.size > 2 * 1024 * 1024) return setError(t('qr.errSize'));
     setFile(f);
     setPreview(URL.createObjectURL(f));
   }
 
   async function handleUpload() {
     if (!file) return;
-    await onUpload(file);
-    setFile(null);
-    setPreview('');
+    setBusy(true);
+    setError('');
+    try {
+      await onUpload(file);
+      setFile(null);
+      setPreview('');
+    } catch (e) {
+      setError(e.message || 'Upload failed');
+    } finally {
+      setBusy(false);
+    }
   }
 
+  const shown = preview || qrUrl;
+
   return (
-    <section className="card">
-      <div className="flex items-center gap-2">
-        <span className="text-xl">💳</span>
-        <h3 className="text-base font-extrabold">{t('qr.title')}</h3>
+    <div>
+      <p className="ios-head">{t('qr.title')}</p>
+      <div className="ios-group">
+        {shown ? (
+          <div className="flex justify-center px-4 py-4">
+            <img
+              src={shown}
+              alt="QR"
+              className={'w-full max-w-[220px] rounded-xl p-2 ' + (preview ? 'border-2 border-dashed border-brand-dark' : 'border border-gray-200')}
+            />
+          </div>
+        ) : (
+          <div className="ios-row text-gray-500">{t('qr.none')}</div>
+        )}
+
+        <label className="ios-row cursor-pointer font-semibold">
+          <span>{shown ? t('qr.change') : t('qr.choose')}</span>
+          <span className="text-gray-400">›</span>
+          <input type="file" accept="image/*" onChange={handlePick} className="hidden" />
+        </label>
       </div>
 
-      {qrUrl ? (
-        <div className="mt-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{t('qr.current')}</p>
-          <img
-            src={qrUrl}
-            alt={t('qr.current')}
-            className="mx-auto w-full max-w-[220px] rounded-xl border border-gray-200 p-2"
-          />
-        </div>
-      ) : (
-        <p className="mt-2 rounded-xl bg-brand-soft px-4 py-3 text-sm text-gray-600">{t('qr.none')}</p>
+      {error && <p className="mt-2 rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-full">{error}</p>}
+
+      {file && (
+        <button onClick={handleUpload} disabled={disabled || busy} className="btn-primary mt-3">
+          {busy ? '…' : t('qr.upload')}
+        </button>
       )}
-
-      {preview && (
-        <img
-          src={preview}
-          alt="Preview"
-          className="mx-auto mt-4 w-full max-w-[220px] rounded-xl border-2 border-dashed border-brand-dark p-2"
-        />
-      )}
-
-      <label className="btn-ghost mt-4 flex cursor-pointer items-center justify-center">
-        {qrUrl || file ? t('qr.change') : t('qr.choose')}
-        <input type="file" accept="image/*" onChange={handlePick} className="hidden" />
-      </label>
-
-      {errorKey && (
-        <p className="mt-3 rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-full">{t(errorKey)}</p>
-      )}
-
-      <button onClick={handleUpload} disabled={!file || disabled} className="btn-primary mt-3">
-        {t('qr.upload')}
-      </button>
-    </section>
+    </div>
   );
 }

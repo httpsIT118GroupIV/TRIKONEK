@@ -109,3 +109,8 @@ export async function getActiveSignals() {
   if (error) throw error;
   return data;
 }
+export async function driverWaiting() {
+  const { data, error } = await supabase.rpc('driver_waiting');
+  if (error) throw error;
+  return data ?? [];
+}

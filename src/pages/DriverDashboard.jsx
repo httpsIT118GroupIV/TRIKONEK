@@ -3,24 +3,26 @@ import { supabase } from '../services/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { useLang } from '../context/LanguageContext';
 import { getMyDriver, updateDriver } from '../services/driverService';
-import { getSheds, getActiveSignals } from '../services/mapService';
+import { getSheds, driverWaiting } from '../services/mapService';
 import {
   driverOpenRequests, driverActiveRequest, releaseRequest, completeRequest, rideErrorKey,
 } from '../services/rideService';
 import {
   driverOpenRentals, driverMyRentals, acceptRental, withdrawRental, rentErrorKey,
+  chatSummary, unreadKeys,
 } from '../services/rentService';
-import { distanceM, formatDistance, bearingDeg } from '../utils/geo';
+import { distanceM, bearingDeg } from '../utils/geo';
 import { alertDriver, unlockAudio } from '../utils/alerts';
 import useWakeLock from '../hooks/useWakeLock';
+import AppHeader from '../components/common/AppHeader';
+import ChatSheet from '../components/common/ChatSheet';
 import DriverTabs from '../components/Driver/DriverTabs';
 import HomeSheet from '../components/Driver/HomeSheet';
 import DriverMap from '../components/Driver/DriverMap';
 import DriverRequests from '../components/Driver/DriverRequests';
 import DriverRentals from '../components/Driver/DriverRentals';
-import Profile from './Profile';
-import AppHeader from '../components/common/AppHeader';
 import NavMap from '../components/Driver/NavMap';
+import Profile from './Profile';
 
 const USE_REAL_GPS = import.meta.env.VITE_USE_REAL_GPS === 'true';
 const MOVING_KMH = 10;
@@ -40,13 +42,16 @@ export default function DriverDashboard() {
   const [rentMine, setRentMine] = useState([]);
   const [routeId, setRouteId] = useState(null);
   const [routeInfo, setRouteInfo] = useState(null);
+  const [navOn, setNavOn] = useState(false);
+  const [goTo, setGoTo] = useState(null);
+  const [chat, setChat] = useState(null);
+  const [unreadSet, setUnreadSet] = useState(new Set());
   const [gps, setGps] = useState(null);
   const [spot, setSpot] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const seen = useRef(new Set());
-  const [navOn, setNavOn] = useState(false);
 
   useEffect(() => {
     getMyDriver(userId)
@@ -61,12 +66,13 @@ export default function DriverDashboard() {
 
   useWakeLock(isOnline);
 
-  // Rentals
+  // Rentals + chat
   const loadRentals = useCallback(async () => {
     try {
       const [o, m] = await Promise.all([driverOpenRentals(), driverMyRentals()]);
       setRentOpen(o ?? []);
       setRentMine(m ?? []);
+      chatSummary().then((s) => setUnreadSet(unreadKeys(s))).catch(() => {});
     } catch { /* ignore */ }
   }, []);
 
@@ -109,7 +115,7 @@ export default function DriverDashboard() {
     return () => navigator.geolocation.clearWatch(watchId);
   }, [isOnline, userId]);
 
-  // Lumang solo request (naiwan para sa kasalukuyang aktibong sundo, kung meron)
+  // Lumang solo request (para sa natirang aktibong sundo)
   useEffect(() => {
     if (!verified) { setRequests([]); setActive(null); return; }
     let stop = false;
@@ -127,10 +133,10 @@ export default function DriverDashboard() {
     return () => { stop = true; clearInterval(timer); };
   }, [isOnline, verified]);
 
-  // Mga naghihintay sa terminal
+  // Mga naghihintay (terminal at tabi ng kalsada)
   useEffect(() => {
     if (!isOnline) { setSignals([]); return; }
-    const load = () => getActiveSignals().then(setSignals).catch(() => {});
+    const load = () => driverWaiting().then(setSignals).catch(() => {});
     load();
     const channel = supabase
       .channel('signals-live')
@@ -161,15 +167,29 @@ export default function DriverDashboard() {
   const waiting = useMemo(
     () =>
       signals
-        .filter((s) => s.shed_id)
         .map((s) => {
-          const sh = sheds.find((x) => x.id === s.shed_id);
-          return sh
-            ? { id: s.id, kind: 'terminal', shedId: sh.id, name: sh.shed_name, lat: Number(sh.latitude), lng: Number(sh.longitude) }
+          if (s.shed_id) {
+            const sh = sheds.find((x) => x.id === s.shed_id);
+            return sh
+              ? { id: s.id, kind: 'terminal', shedId: sh.id, name: sh.shed_name, lat: Number(sh.latitude), lng: Number(sh.longitude) }
+              : null;
+          }
+          return s.latitude != null
+            ? { id: s.id, kind: 'roadside', lat: Number(s.latitude), lng: Number(s.longitude) }
             : null;
         })
         .filter(Boolean),
     [signals, sheds]
+  );
+
+  const roadsideRows = useMemo(
+    () =>
+      waiting
+        .filter((w) => w.kind === 'roadside')
+        .map((w) => ({ ...w, dist: me ? distanceM(me, [w.lat, w.lng]) : null }))
+        .sort((a, b) => (a.dist ?? 1e9) - (b.dist ?? 1e9))
+        .slice(0, 5),
+    [waiting, me]
   );
 
   const kmh = gps?.speed != null ? gps.speed * 3.6 : 0;
@@ -183,6 +203,8 @@ export default function DriverDashboard() {
         dest: routeR.dest_lat != null ? [Number(routeR.dest_lat), Number(routeR.dest_lng)] : null,
       }
     : null;
+
+  const unreadRentals = unreadSet;
 
   async function run(action) {
     setBusy(true);
@@ -290,19 +312,22 @@ export default function DriverDashboard() {
     );
   }
 
+  const navigating = goTo || (navOn && routeR && routeProps?.dest);
+
   return (
     <div className="flex h-dvh flex-col bg-brand-soft">
       <AppHeader badge={driver.tricycle_plate_number} />
 
       {tab === 'home' && (
         <div className="relative min-h-0 flex-1">
-          {navOn && routeR && routeProps?.dest ? (
+          {navigating ? (
             <NavMap
+              key={goTo ? 'go' : 'rent'}
               me={me}
-              pickup={routeProps.pickup}
-              dest={routeProps.dest}
-              customer={routeR.customer}
-              onStop={() => setNavOn(false)}
+              pickup={goTo ?? routeProps.pickup}
+              dest={goTo ? null : routeProps.dest}
+              customer={goTo ? t('drv.wpTitle') : routeR.customer}
+              onStop={() => { setNavOn(false); setGoTo(null); }}
             />
           ) : (
             <>
@@ -327,7 +352,18 @@ export default function DriverDashboard() {
                   error={error}
                   active={active}
                   requestProps={reqProps}
-                  rentRoute={routeR ? { rental: routeR, info: routeInfo, onClose: () => { setRouteId(null); setNavOn(false); }, onStart: () => setNavOn(true) } : null}
+                  rentRoute={
+                    routeR
+                      ? {
+                          rental: routeR,
+                          info: routeInfo,
+                          onClose: () => { setRouteId(null); setNavOn(false); },
+                          onStart: () => setNavOn(true),
+                        }
+                      : null
+                  }
+                  roadside={roadsideRows}
+                  onGo={(w) => setGoTo([w.lat, w.lng])}
                   onOnline={(v) => { if (v) unlockAudio(); run(() => updateDriver(userId, { is_online: v })); }}
                   onAccepting={(v) => { if (v) unlockAudio(); run(() => updateDriver(userId, { accepting_requests: v })); }}
                   onStatus={(s) => run(() => updateDriver(userId, { status: s }))}
@@ -352,7 +388,9 @@ export default function DriverDashboard() {
               waiting={waiting}
               online={isOnline}
               busy={busy}
-              onAccept={(id) => rentAct(acceptRental, id)}
+              unread={unreadRentals}
+              onChat={(r) => setChat({ rentalId: r.id, title: `${t('chat.group')} · ${r.customer}` })}
+               onAccept={(id) => rentAct(acceptRental, id)}
               onWithdraw={(id) => rentAct(withdrawRental, id)}
               onShowRoute={(id) => { setRouteInfo(null); setRouteId(id); setTab('home'); }}
             />
@@ -366,7 +404,11 @@ export default function DriverDashboard() {
         </div>
       )}
 
-      <DriverTabs tab={tab} onChange={setTab} badge={rentOpen.length} />
+      <DriverTabs tab={tab} onChange={setTab} badge={rentOpen.length + unreadRentals.size} />
+
+      {chat && (
+        <ChatSheet {...chat} onClose={() => { setChat(null); loadRentals(); }} />
+      )}
     </div>
   );
 }
